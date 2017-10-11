@@ -64,7 +64,7 @@ wl <- get_whitelist(pred_sensores,colnames(df))
 #' 
 #' 
 df[,1:ncol(df)] <- lapply(df[,1:ncol(df)],as.numeric) # <- convertir a numeric
-until <- round(nrow(df)*.7) 
+until <- round(nrow(df)*.67) 
 training.set = df[1:until-1, ] # This is training set to learn the parameters
 test.set = df[until:nrow(df), ]
 until
@@ -218,7 +218,7 @@ for(i in 1:length(pred_sensores))
 var_pred <- pred_sensores[4]
 Y_class <- as.factor(with(df,ifelse(df[,pred_sensores[4]] <= 0,1,0)))
 
-hasta <- round(nrow(df)*.7)
+hasta <- round(nrow(df)*.67)
 hasta
 summary(Y_class)
 summary(Y_class[hasta:length(Y_class)])
