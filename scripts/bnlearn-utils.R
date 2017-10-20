@@ -1,6 +1,7 @@
 
 library(bnlearn)
-#' blacklist
+
+#' blacklist: las variables predictoras no pueden conectarse entre ellas
 #' Recibe un array (pred_sensores) con nombres de variables, es decir, cada elemento del array es un string.
 #' Regresa un dataframe con campos from y to.
 #' tested
