@@ -1,5 +1,7 @@
 
 library(bnlearn)
+library(forecast)
+library(caret)
 
 #' blacklist: las variables predictoras no pueden conectarse entre ellas
 #' Recibe un array (pred_sensores) con nombres de variables, es decir, cada elemento del array es un string.
@@ -80,6 +82,46 @@ conf_matrix <- function(fitted,pred_sensores,test.set, breaks, verbose = TRUE)
   return(lista)
 }
 
+#'caso para breaks binario
+conf_matrix_df_frost <- function(fitted,pred_sensores,test.set, verbose = TRUE)
+{
+  require(caret)
+  
+  breaks <- c(-20,0,50) # caso Helada y no helada
+  columnas <- c("Variable","A","B","C","D","Accuracy","Sensitivity/Recall","Specificity","Precision")
+  
+  results <- data.frame(Variable=as.Date(character()),A=numeric(),B=numeric(),C=numeric(),
+                        D=numeric(), accuracy= as.numeric(), sensitivity = as.numeric(),
+                        specificity = as.numeric(), precision= as.numeric()
+                        ,stringsAsFactors=FALSE) 
+  
+  for(i in 1:length(pred_sensores))
+  {
+    pred = predict(fitted, pred_sensores[i], test.set)
+    y <- cut(test.set[, pred_sensores[i]], breaks = breaks)
+    y_pred <- cut(pred, breaks = breaks)
+    
+    c <- confusionMatrix(y_pred,y)
+    
+    A <- c$table[1]
+    B <- c$table[3]
+    C <- c$table[2]
+    D <- c$table[4]
+    
+    sens <- sensitivity(y_pred,y)
+    spec <- specificity(y_pred, y)
+    p <- precision(y_pred,y)
+    acc <- c$overall["Accuracy"]
+    
+    #aux <- c(A,B,C,D,acc,sens,spec,p)
+    #aux <- apply(aux,as.numeric)
+    results <- rbind.data.frame(results, cbind.data.frame(pred_sensores[i],A,B,C,D,acc,sens,spec,p))
+    
+  }
+  colnames(results) <- columnas
+  # regresar la lista
+  return(results)
+}
 
 #' ## REGRESSION TOOLS
 #' r squared plots
