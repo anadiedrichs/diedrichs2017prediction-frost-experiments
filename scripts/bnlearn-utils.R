@@ -108,10 +108,10 @@ conf_matrix_df_frost <- function(fitted,pred_sensores,test.set, verbose = TRUE)
     C <- c$table[2]
     D <- c$table[4]
     
-    sens <- sensitivity(y_pred,y)
-    spec <- specificity(y_pred, y)
-    p <- precision(y_pred,y)
-    acc <- c$overall["Accuracy"]
+    sens <- round(sensitivity(y_pred,y),2)
+    spec <- round(specificity(y_pred, y),2)
+    p <- round(precision(y_pred,y),2)
+    acc <- round(c$overall["Accuracy"],2)
     
     #aux <- c(A,B,C,D,acc,sens,spec,p)
     #aux <- apply(aux,as.numeric)
@@ -172,11 +172,12 @@ errors_regression <- function(pred_sensores, fitted, test.set, verbose = TRUE){
   
   for(i in 1:length(pred_sensores))
   {
-    cat("Testing on ",pred_sensores[i],"\n")
+    #cat("Testing on ",pred_sensores[i],"\n")
     # predicts the value of node pred_sensores[i]  given test set
     pred = predict(fitted, pred_sensores[i], test.set)  
     # compare the actual and predicted, then print the values
     aux <- accuracy(f = pred, x = test.set[,pred_sensores[i]])
+    aux <- round(aux,2)
     #print(cbind(pred, real=test.set[, pred_sensores[i]]))
     
     r <- c(as.character(pred_sensores[i]),apply(aux,2,as.double))
