@@ -1,14 +1,23 @@
 
-require(readr)
-require(xts)
-require(timeDate)
+library(readr)
+library(xts)
+library(timeDate)
 
+#' Dataset dacc (año 2007 hasta 2014) son los datos sumarizados diarios de las estaciones:
+#' * Junín
+#' * Tunuyán
+#' * Agua Amarga
+#' * Las Paredes
+#' * La Llave
+#' 
+#' Dataset dacc-temp es el dataset dacc pero solo con información de temperaturas
+#' 
+#' Dataset dacc-spring es el dataset dacc pero solo con datos de dias de agosto hasta noviembre inclusive de cada año
 
 dataset <- c("dacc","dacc-temp","dacc-spring")
 
-#' Get a dataset by index
-#' 
-#' 
+#' Get a dataset by name
+
 get.dataset <- function(d)
 {
   if(d==dataset[1]) return(dacc())
@@ -18,78 +27,57 @@ get.dataset <- function(d)
 }
 
 # probado
-dacc.spring <- function(){
-  
-  library(readr)
-  data <- read_csv("~/phd-repos/tmin/bnlearn/data/estaciones-dacc-diarios.csv")
-  # data[1632,30:35]
-  # reemplazo valor erroneo 784
-  data[1632,33] <- 25
-  
-  library(xts)
-  library(timeDate)
-  #' Variables del dataset
-  #' 
-  dfx <- xts(data[3:ncol(data)], order.by=as.timeDate(strptime(data$date,"%Y-%m-%d")))
-  dd <- dfx[.indexmon(dfx) %in% c(7,8,10,11),] # mes agosto, setiembre, octubre, noviembre
-  
-  #TODO cambiar return a 
-  
-  #return(list(data=sensores, pred= pred_sensores,name="dacc"))
-  return(dd)
-  #' Una vista breve
-  
-}
-
-# probado
 dacc <- function()
 {
   
   sensores <- read_csv("~/phd-repos/tmin/bnlearn/data/estaciones-dacc-diarios.csv")
   
-  #pred_sensores = colnames(sensores)[c(6,12,18,23,29)]
-  
   #' reemplazo valor erroneo (temperatura máxima por los 780)
   #' 
   sensores[1632,33] <- 25
   
-  #' Columnas a borrar
-  erase <- colnames(sensores)[1:2]
-  erase
-  sensores <- sensores[,-which(names(sensores) %in% erase)]
-  colnames(sensores)
+  #' Columnas a borrar "X1"
+  sensores <- sensores[,-1]
   
   #' como denomino a las variables que quiero predecir
-  pred_sensores = colnames(sensores)[c(4,10,16,21,27)]
+  pred_sensores = colnames(sensores)[c(5,11,17,22,28)]
+  
+  #' quito datos estacion el marcado
+  #' 
+  h <- colnames(sensores)[grepl("el_marcado", colnames(sensores))]
+  sensores <- sensores[,-which(names(sensores) %in% h)]
   
   return(list(data=sensores, pred= pred_sensores,name="dacc"))
 }
 
-# TODO HACER!!!
-dacc.temp <- function()
-{
-  library(readr)
-  data <- read_csv("~/phd-repos/tmin/bnlearn/data/estaciones-dacc-diarios.csv")
-  # data[1632,30:35]
-  # reemplazo valor erroneo 784
-  data[1632,33] <- 25
+# 
+dacc.spring <- function(){
   
-  library(xts)
-  library(timeDate)
+  d <- dacc()
+  data <- d$data
+  
   #' Variables del dataset
   #' 
-  dfx <- xts(data[3:ncol(data)], order.by=as.timeDate(strptime(data$date,"%Y-%m-%d")))
- 
+  dfx <- xts(data[3:ncol(data)], order.by=as.Date(strptime(data$date,"%Y-%m-%d")))
+  dd <- dfx[.indexmon(dfx) %in% c(7,8,10,11),] # mes agosto, setiembre, octubre, noviembre
+  d1 <- data.frame(date=index(dd), coredata(dd))
+  
+  return(list(data = d1, pred = d$pred_sensores, name="dacc-spring"))
+}
+
+# probar
+dacc.temp <- function()
+{
+  d <- dacc()
+  data <- d$data
+  
   #' Quitar columnas de humedad
-  #' las columnas con humedad tienen los caractere Hm
+  #' las columnas con humedad tienen los caracteres Hm
   #' 
-  h <- colnames(dfx)[grepl("Hm", colnames(dfx))]
-  d <- dfx[,-which(names(dfx) %in% h)]
+  h <- colnames(data)[grepl("Hm", colnames(data))]
+  data <- data[,-which(names(data) %in% h)]
   
-  # lso valores minimos diarios son los que nos interesa predecir
-  pred_sensores = colnames(sensores)[c(1,4,7,12,18)]
-  
-  return(list(data = d, pred = pred_sensores, name="dacc-temp"))
+  return(list(data = data, pred = d$pred_sensores, name="dacc-temp"))
 }
 
 
