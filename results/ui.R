@@ -33,7 +33,9 @@ shinyUI(fluidPage(
         
         tabPanel("Plot", plotlyOutput("plot")), 
         # tabPanel("Summary", verbatimTextOutput("summary")), 
-        tabPanel("Table", dataTableOutput("tbl"))
+        tabPanel("Table", dataTableOutput("tbl")),
+        tabPanel("Error distribution",plotOutput("cummulative")),
+        tabPanel("Cummulative differences",dataTableOutput("cumm"))
       )
     )
   )

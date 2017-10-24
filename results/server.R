@@ -54,7 +54,7 @@ function(input, output, session){
     
     if(is.null(input$variable)){return()}
     findthis <- paste(input$dataset,input$T,input$config,input$alg,input$score,input$variable,sep = "--")
-    archivo <- read.csv(files[grep(findthis, files,fixed=TRUE)])
+    archivo <- read.csv(lista[grep(findthis, lista,fixed=TRUE)])
     #cumm <- cumm[-1] #quito la primer columna nombre x
     model$data <- archivo
     return(archivo)
@@ -77,23 +77,16 @@ function(input, output, session){
     }
   })
   
-  
-  # tabla <- reactive({
-  # 
-  #     if(is.null(input$modelTrain) || is.null(input$configVecinos)|| is.null(model$data)){ return()}
-  #     col <- colnames(model$data)
-  #     n <- grep("nnet",col)
-  #     nn <- grep("MI",col)
-  #     isolate(tablita$data <- model$data[,intersect(n,nn)])
-  #     isolate(tablita$data)
-  # })
-  
 
-  output$tbl <- renderDataTable(model$data)  
+  output$tbl <- renderDataTable({
+    
+    if(is.null(model) || is.null(model$data)){return(0)}
+    model$data
+    })  
   
   output$plot <- renderPlotly({
     
-    if(is.null(model) || is.null(model$data)){return(0)}
+    if(is.null(model) || is.null(model$data)){return()}
     p <- plot_ly() %>%
          add_trace( x = model$data$X, y = model$data[,2], mode = "lines",name=colnames(model$data)[2]) %>%
          add_trace(p, x = model$data$X, y = model$data[,3], mode = "lines",name=colnames(model$data)[3])
@@ -104,15 +97,18 @@ function(input, output, session){
   #TODO
   output$errors <- renderDataTable({
     
+    if(is.null(model) || is.null(model$data)){return()}
     aux <- accuracy(f = model$data[,3], x = model$data[,2])
     aux <- round(aux,2)
     aux
     
   })
 
-  #TODO
+  #Matriz de confusion caso de heladas
   output$confMatFrost <- renderPrint({
     
+    
+    if(is.null(model) || is.null(model$data)){return(0)}
     breaks <- c(-20,0,50) # caso Helada y no helada
     y <- cut(model$data[,2], breaks = breaks)
     y_pred <- cut(model$data[,3], breaks = breaks)
@@ -120,22 +116,64 @@ function(input, output, session){
     
   })
   
-  
+  #Matriz de confusion analizando rango de temperaturas
   output$confMatTemps <- renderPrint({
    
+    
+    if(is.null(model) || is.null(model$data)){return(0)}
      breaks <- c(-20,-5,0,2,5,10,50) # caso Helada y no helada
     y <- cut(model$data[,2], breaks = breaks)
     y_pred <- cut(model$data[,3], breaks = breaks)
     c <- confusionMatrix(y_pred,y)
     c
   })
+  # diff <- abs(round(y - pred,2))
   
+  output$cummulative <- renderPlot({
+    
+    
+    if(is.null(model) || is.null(model$data)){return(0)}
+    
+    breaks <- seq(from=0,to = 3, by= 0.5) # caso Helada y no helada
+    
+    diff <- abs(round(model$data[,2] - model$data[,3],2))
+    
+    y <- cut(diff, breaks = breaks)
+    
+    histogram(y)
+  })
   
-  # output$plot1 <- renderPlot({
-  #   if(is.null(input$variable) || is.null(input$elegirModelo)){return()}
-  #   p <- plot_ly() %>%
-  #     add_trace(x = index, y =model$data[,input$elegirModelo], mode = "lines")
-  #   p
-  #   })
+  ## probar lo de abajo
+  output$cumm <- renderDataTable({
+    
+    
+    if(is.null(model) || is.null(model$data)){return(0)}
+    
+    diff <- abs(round(model$data[,2] - model$data[,3],2))
+    
+    total <- length(diff)
+    max.value <- 3
+    interval <- 0.5
+    error <- matrix(data = 0,nrow=max.value/interval,ncol = 3)
+    rows <- c()
+    data <- list()
+    j <- 0.5
+    i <- 1
+    
+    while(j <= max.value)
+      #for(j = 0.5,i = 1;j < max.value; )
+    {
+      error[i,1] <- length(which(diff<=j))
+      error[i,2] <- error[i,1]/total * 100
+      rows <- c(rows, j)
+      j <- j+0.5; i <- i+1
+    }
+    print(error)
+    
+    d <- as.data.frame(cbind(rows,error[,2]))
+    colnames(d) <- c("intervals","error")
+    
+    d
+  })
   
 }
