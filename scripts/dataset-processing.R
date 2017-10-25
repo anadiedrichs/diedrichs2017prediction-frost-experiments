@@ -21,8 +21,8 @@ dataset <- c("dacc","dacc-temp","dacc-spring")
 get.dataset <- function(d)
 {
   if(d==dataset[1]) return(dacc())
-  else if(d==dataset[2]) return(dacc.spring())
-  else if(d==dataset[3]) return(dacc.temp())
+  else if(d==dataset[2]) return(dacc.temp())
+  else if(d==dataset[3]) return(dacc.spring())
   else stop("ERROR get.dataset, you muss pass the correct argument value")
 }
 
