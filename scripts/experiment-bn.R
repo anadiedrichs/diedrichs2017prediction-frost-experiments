@@ -14,11 +14,10 @@ library(caret) # para confusion matrix
 library(forecast) # para metodo accuracy
 
 library(doParallel)
-
+library(unbalanced)
 set.seed(147)
 
-
-packages <- c("bnlearn","caret","forecast")
+packages <- c("bnlearn","caret","forecast","unbalanced","readr","xts","timeDate")
 # si quiero guardar los dataset desfasados para ser usados por otras librerías.
 
 SAVE_DATASET <- TRUE
@@ -41,29 +40,137 @@ period <- c(1,2,3,4,5)
 #' a score equivalent Gaussian posterior density (bge).
 score <- c("bic-g","loglik-g","aic-g","bge")
 
-columnas <- c("dataset","days","ncol","nrow","config_train", "t_run_s"," t_fitted","var")
+#' m = model or predicted values
+#' o = observed or real values
+#' 
+RMSE = function(m, o){  sqrt(mean((m - o)^2)) } #tested
+rsq <- function(x, y){ summary(lm(y~x))$r.squared } #tested
 
-results <- data.frame(dataset=as.Date(character()),days=numeric(),ncol=numeric(),nrow=numeric(),
-           config_train=character(), t_run_s = as.numeric(), t_fitted = as.numeric(),
-           var = character(),stringsAsFactors=FALSE) 
 
-training.config <- function(df,type="normal",p=0.68)
+#' pred & obs are vectors or arrays with the same length
+evaluate <- function(pred, obs) #tested
 {
-  if(type=="normal")
-  {
-    until <- round(nrow(df)*p)
-    training.set = df[1:until-1, ] # This is training set to learn the parameters
-    test.set = df[until:nrow(df), ]
+  #"RMSE","r2","Sensitivity","Acc","Precision"
+  rmse <- round(RMSE(pred,obs),2)
+  r2 <- round(rsq(obs,pred),2)
+  breaks <- c(-20,0,50) # caso Helada y no helada
+  y <- cut(obs, breaks = breaks)
+  y_pred <- cut(pred, breaks = breaks)
+  sens <- round(sensitivity(y_pred,y),2)
+  spec <- round(specificity(y_pred, y),2)
+  p <- round(precision(y_pred,y),2)
+  c <- confusionMatrix(y_pred,y)
+  acc <- round(c$overall["Accuracy"],2)
+  return(list(rmse = rmse, r2 = r2, sens= sens, spec= spec, prec= p, acc= acc))
+}
+
+
+trainingNormal <- function(df,alg,sc, file.name, pred_sensores, fila,p=0.68)
+{
   
-    }else if(type=="smote")
+  until <- round(nrow(df)*p)
+  training.set = df[1:until-1, ] # This is training set to learn the parameters
+  test.set = df[until:nrow(df), ]
+  
+  rr <- learn.bayes(training.set, wl,bl,alg=alg,sc=sc)
+  res = rr$model
+  save(res, file = paste(file.name,"--bn.RData",sep="")) #,Sys.time()
+  
+  #' Aprendizaje de parametros
+  #'
+  start_time <- Sys.time()
+  fitted = bn.fit(rr$model, training.set)     # learning of parameters
+  end_time <- Sys.time()
+  fitted.time <- round(as.numeric(end_time - start_time),3)
+  save(fitted, file = paste(file.name,"--fitted.RData",sep="")) #,Sys.time()
+  #' guardo modelo para más análisis o corridas posteriores
+  #'
+  
+  for(p in 1:length(pred_sensores))
   {
+    # nombre variable a predecir
+    f <- paste(file.name,pred_sensores[p],sep="--")
+    #row <- c(row,pred_sensores[p]) 
+    # prediccion
+    pred = predict(fitted, pred_sensores[p], test.set)
+    # guardar csv con valor real vs predicho
+    dataset <- as.data.frame(cbind(test.set[pred_sensores[p]],pred))
+    colnames(dataset)<- c("y_real","y_pred")
+    write.csv(x = dataset,file = paste("./results/",f,"--Y-vs-Y_pred.csv",sep = ""))
+    #evaluar resultados en testeo
+    eee <- evaluate(pred,test.set[,pred_sensores[p]])
+    #guardo detalles del experimento
+    row <- paste(fila,rr$time,fitted.time,NA,nrow(training.set),NA,pred_sensores[p],
+                 eee$rmse,eee$r2,eee$sens,eee$acc,eee$prec,eee$spec,sep=",")
+    write(row, file=RESUMEN, append = TRUE)
     
-  }else stop("invalid value in argument type in training.config")
+  }
+    
+  return()
+}
+
+trainingSMOTE <- function(df,alg,sc, file.name, var, fila,p=0.68)
+{
+  until <- round(nrow(df)*p)
+  training.set = df[1:until-1, ] # This is training set to learn the parameters
+  test.set = df[until:nrow(df), ]
+  nfrostorig <- length(training.set[training.set[,var] <= 0,var])
   
-  return(list(train=training.set,test=test.set))
+  #' Me enfoco en el caso de una sola estación junin, por lo que analizaremos solo la predicción sobre la misma....
+  Y_class <- as.factor(with(df,ifelse(df[,var] <= 0,1,0)))
+  summary(Y_class)
+  summary(Y_class[until:length(Y_class)])
+
+  #' datos para entrenar
+  data_smote <- ubBalance(training.set,Y_class[1:(until-1)],type = "ubSMOTE",percOver = 300, percUnder = 150)
+  
+  #guardar este dataset desfasado en T
+  if(SAVE_DATASET){  write.csv(data_smote$X,paste(paste(file.name,var,"smote-dataset.csv",sep="--"))) }
+  
+  #' para visualizar la distribución de las clases
+  #' 
+  summary(data_smote$Y)
+  training.set <- data_smote$X
+  nfrost <- length(data_smote$X[data_smote$X[,var] <= 0,var])
+  #guardar este dataset desfasado en T
+  if(SAVE_DATASET){  write.csv(aux$data,paste(paste(dd$name,t,sep = "--"),"dataset.csv",sep="--"))  }
+  
+  
+  rr <- learn.bayes(training.set, wl,bl,alg=alg,sc=sc)
+  res = rr$model
+  save(res, file = paste(file.name,"--bn.RData",sep="")) #,Sys.time()
+  
+  #' Aprendizaje de parametros
+  #'
+  start_time <- Sys.time()
+  fitted = bn.fit(rr$model, training.set)     # learning of parameters
+  end_time <- Sys.time()
+  fitted.time <- round(as.numeric(end_time-start_time),3)
+  save(fitted, file = paste(file.name,"--fitted.RData",sep="")) #,Sys.time()
+  print(file.name)
+
+  # nombre variable a predecir
+  f <- paste(file.name,var,sep="--")
+  #row <- c(row,pred_sensores[p]) 
+  # prediccion
+  pred = predict(fitted, var, test.set)
+  # guardar csv con valor real vs predicho
+  dataset <- as.data.frame(cbind(test.set[var],pred))
+  colnames(dataset)<- c("y_real","y_pred")
+  write.csv(x = dataset,file = paste("./results/",f,"--Y-vs-Y_pred.csv",sep = ""))
+
+  #evaluar resultados en testeo
+  eee <- evaluate(pred,test.set[,var])
+  #guardo detalles del experimento
+  row <- paste(fila,rr$time,fitted.time,nfrostorig,nrow(training.set),nfrost,var,
+               eee$rmse,eee$r2,eee$sens,eee$acc,eee$prec,eee$spec,sep=",")
+  write(row, file=RESUMEN, append = TRUE)
+  
+  return()
 }
 
 #' funcion de aprendizaje bayesiano variables continuas
+#' probada
 learn.bayes <- function(df, wl=NULL,bl=NULL,alg="hc",sc="bic")
 {
   time = NULL; res = NULL
@@ -85,15 +192,24 @@ learn.bayes <- function(df, wl=NULL,bl=NULL,alg="hc",sc="bic")
     
   }
   
-  return(list(model=res, time = as.numeric(time)))
+  return(list(model=res, time = round(as.numeric(time),3)))
   
 }
 
 
-cl <- makeCluster(4)  
+cl <- makeCluster(4) # colocar 12 en server
 registerDoParallel(cl)  
 
-for(j in 1:3) # POR cada uno de los datasets
+
+RESUMEN <<- paste(Sys.time(),"--experimento.csv",sep="")
+columnas <- paste("dataset","days","ncol","nrow","config_train","alg","score",
+                  "t_run_s"," t_fitted","nfrostorig","ntrain","nfrostsmote","var",
+                  "RMSE","r2","Sensitivity","Acc","Precision","Specificity",sep = ",")
+#"ntrain", "ntest",
+write(columnas,file=RESUMEN)
+
+foreach(j = 1:3,.packages = packages) %dopar% 
+#for(j in 1:3) # POR cada uno de los datasets
 {
  # traigo dataset 
   dd <-get.dataset(dataset[j])
@@ -101,7 +217,8 @@ for(j in 1:3) # POR cada uno de los datasets
   pred_sensores_base <- dd$pred
   cat("DATASET ",dd$name,"\n")
   
-  for(t in 1:length(period))
+  foreach(t = 1:length(period),.packages = packages) %dopar% 
+  #for(t in 1:length(period))
   {
     #row <- cbind.data.frame(row,t)
     #file.name <- paste(file.name,t,sep = "--")
@@ -113,81 +230,46 @@ for(j in 1:3) # POR cada uno de los datasets
     
     #guardar este dataset desfasado en T
     if(SAVE_DATASET){  write.csv(aux$data,paste(paste(dd$name,t,sep = "--"),"dataset.csv",sep="--"))  }
-    #' nombres de las variables a usar para entrenar/testear
-    #' nro de variables
-    #row <- cbind.data.frame(row,ncol(df))
-    #' nro de ejemplos
-    #row <- cbind.data.frame(row,nrow(df))
-
+    
     bl <- get_blacklist(pred_sensores)
     wl <- get_whitelist(pred_sensores,colnames(df))
-    
-    for(c in 1:length(config.train))
+
+    foreach(a = 1:length(alg),.packages = packages) %dopar% 
+    #for(a in 1:length(alg))
     {
-      #row <- cbind.data.frame(row,config.train[c])
-      #file.name <- paste(file.name,config.train[c],sep = "--")
-      #' ### Training set y test dataset
-      df[,1:ncol(df)] <- lapply(df[,1:ncol(df)],as.numeric) # <- convertir a numeric
-      u <- training.config(df,type=config.train[c])
-      training.set = u$train
-      test.set = u$test
-      
-      for(a in 1:length(alg))
+      foreach(s = 1:length(score),.packages = packages) %dopar%   
+      #for(s in 1:length(score))
       {
         
-        foreach(s = 1:length(score),.packages = packages) %dopar%
-        {
-          
-          #file.name <- paste(file.name,score[s],sep="--")
-          #row <- cbind.data.frame(row,score[s])
-          rr <- learn.bayes(training.set, wl,bl,alg=alg[a],sc=score[s])
-          res = rr$model
-          #row <- cbind.data.frame(row,rr$time) # chequear unidad del tiempo (segundos, milisegundos, etc)
-          #' Aprendizaje de parametros
-          #'
-          start_time <- Sys.time()
-          fitted = bn.fit(rr$model, training.set)     # learning of parameters
-          end_time <- Sys.time()
-          #row <- cbind.data.frame(row,as.numeric(end_time - start_time)) # chequear unidad del tiempo (segundos, milisegundos, etc)
-          
-          #end_time - start_time
-          #' guardo modelo para más análisis o corridas posteriores
-          #'
-          
-          file.name <- paste(dd$name,t,config.train[c],alg[a],score[s],sep = "--")
-          save(res, file = paste(file.name,".RData",sep="")) #,Sys.time()
-          print(file.name)
-          
-          # RMSE y otros errores por cada variable a predecir
-          err <- errors_regression(pred_sensores, fitted, test.set, verbose = TRUE)
-          write.csv(x = err,file = paste("./results/",file.name,"--error.csv",sep = ""))
-          
-          # Confusion matrix de heladas
-          confm <- conf_matrix_df_frost(fitted,pred_sensores,test.set)
-          write.csv(x = confm,file = paste("./results/",file.name,"--confusionMatrixHelada.csv",sep = ""))
-          print(confm)
-          # realizar prediccion en test.set, guardar Y - Ypred en archivo
-          for(p in 1:length(pred_sensores))
+        foreach(c = 1:length(config.train),.packages = packages) %dopar%        
+        #  for(c in 1:length(config.train))
           {
-            # nombre variable a predecir
-            f <- paste(file.name,pred_sensores[p],sep="--")
-            #row <- c(row,pred_sensores[p]) 
-            # prediccion
-            pred = predict(fitted, pred_sensores[p], test.set)
-            # guardar csv con valor real vs predicho
-            dataset <- as.data.frame(cbind(test.set[pred_sensores[p]],pred))
-            colnames(dataset)<- c("y_real","y_pred")
-            write.csv(x = dataset,file = paste("./results/",f,"--Y-vs-Y_pred.csv",sep = ""))
-          }
+            u <- NULL
+            #' ### Training set y test dataset
+            df[,1:ncol(df)] <- lapply(df[,1:ncol(df)],as.numeric) # <- convertir a numeric
+            file.name <- paste(dd$name,t,config.train[c],alg[a],score[s],sep = "--")
+            
+            if(config.train[c]=="normal")
+            {
+              
+              fila <- paste(dd$name,t,ncol(df),nrow(df),config.train[c],alg[a],score[s],sep=",")
+              
+              trainingNormal(df, alg=alg[a],sc=score[s], file.name = file.name, pred_sensores = pred_sensores , fila)
+              
+            }else if(config.train[c]=="smote")
+            {
+              
+              fila <- paste(dd$name,t,ncol(df),nrow(df),config.train[c],alg[a],score[s],sep=",")
+              
+              for(p in 1:length(pred_sensores))
+              {
+                trainingSMOTE(df, alg=alg[a],sc=score[s], file.name = file.name, var = pred_sensores[p], fila )
+              }
+            }
           
-          # agrego fila al dataset
-          row <- cbind.data.frame(dd$name,t,ncol(df),nrow(df),config.train[c],alg[a],score[s],rr$time,as.numeric(end_time - start_time))
-          print(row)
-          results <- rbind.data.frame(results,row)
-          
+          }# por training config 
         }# for por score
       }# for por algoritmo  
-    }# por training config 
   }#for por T
 }# for por dataset
 
@@ -195,9 +277,6 @@ for(j in 1:3) # POR cada uno de los datasets
 #   user  system elapsed 
 #  3.392   0.193   3.664 
 stopCluster(cl)
-
-colnames(results) <- columnas
-write.csv(x = results,file = paste("./results/",Sys.time(),"--experimentos.csv",sep = ""))
 
 # no correr!! es solo codigo copypaste
 testeo.results <- function()
