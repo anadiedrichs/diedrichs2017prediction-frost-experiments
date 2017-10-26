@@ -26,7 +26,7 @@ split.train <- 0.68 # porcentaje de datos en el dataset de entremaniento
 
 ################
 
-dataset <- c("dacc","dacc-temp","dacc-spring")
+dataset <- c("dacc","dacc-temp","dacc-spring") #"dacc",
 config.train <-c("normal","smote")
 #' VEC si considera solo informacion de la misma estacion ("solo") o todas las variables
 vec <- c("vec") #TODO ,"solo"
@@ -81,7 +81,7 @@ trainingNormal <- function(df,alg,sc, file.name, pred_sensores, fila,p=0.68)
   start_time <- Sys.time()
   fitted = bn.fit(rr$model, training.set)     # learning of parameters
   end_time <- Sys.time()
-  fitted.time <- round(as.numeric(end_time - start_time),3)
+  fitted.time <- round(as.numeric(difftime(end_time, start_time, units = "secs")),3)
   save(fitted, file = paste(file.name,"--fitted.RData",sep="")) #,Sys.time()
   #' guardo modelo para más análisis o corridas posteriores
   #'
@@ -132,8 +132,6 @@ trainingSMOTE <- function(df,alg,sc, file.name, var, fila,p=0.68)
   summary(data_smote$Y)
   training.set <- data_smote$X
   nfrost <- length(data_smote$X[data_smote$X[,var] <= 0,var])
-  #guardar este dataset desfasado en T
-  if(SAVE_DATASET){  write.csv(aux$data,paste(paste(dd$name,t,sep = "--"),"dataset.csv",sep="--"))  }
   
   
   rr <- learn.bayes(training.set, wl,bl,alg=alg,sc=sc)
@@ -158,12 +156,24 @@ trainingSMOTE <- function(df,alg,sc, file.name, var, fila,p=0.68)
   dataset <- as.data.frame(cbind(test.set[var],pred))
   colnames(dataset)<- c("y_real","y_pred")
   write.csv(x = dataset,file = paste("./results/",f,"--Y-vs-Y_pred.csv",sep = ""))
-
-  #evaluar resultados en testeo
-  eee <- evaluate(pred,test.set[,var])
-  #guardo detalles del experimento
-  row <- paste(fila,rr$time,fitted.time,nfrostorig,nrow(training.set),nfrost,var,
-               eee$rmse,eee$r2,eee$sens,eee$acc,eee$prec,eee$spec,sep=",")
+  
+  
+  if(length(is.na(pred))<1){
+  
+    #evaluar resultados en testeo
+    eee <- evaluate(pred,test.set[,var])
+    #guardo detalles del experimento
+    row <- paste(fila,rr$time,fitted.time,nfrostorig,nrow(training.set),nfrost,var,
+                 eee$rmse,eee$r2,eee$sens,eee$acc,eee$prec,eee$spec,sep=",")
+    
+  }else{
+    # CASO EN el que los parámetros no pueden ser calculados por pocos datos
+    # u otro error
+    #guardo detalles del experimento
+    row <- paste(fila,rr$time,fitted.time,nfrostorig,nrow(training.set),nfrost,var,
+                 NA,NA,NA,NA,NA,NA,sep=",")
+    
+  }
   write(row, file=RESUMEN, append = TRUE)
   
   return()
@@ -181,14 +191,14 @@ learn.bayes <- function(df, wl=NULL,bl=NULL,alg="hc",sc="bic")
     start_time <- Sys.time()
     res = hc(df, whitelist=wl,blacklist = bl, score = sc)
     end_time <- Sys.time()
-    time = end_time - start_time
+    time = round(as.numeric(difftime(end_time, start_time, units = "secs")),3)
     
   }else if(alg=="tabu"){
     
     start_time <- Sys.time()
     res = tabu(df, whitelist=wl,blacklist = bl, score = sc)
     end_time <- Sys.time()
-    time = end_time - start_time
+    time = round(as.numeric(difftime(end_time, start_time, units = "secs")),3)
     
   }
   
@@ -197,8 +207,8 @@ learn.bayes <- function(df, wl=NULL,bl=NULL,alg="hc",sc="bic")
 }
 
 
-cl <- makeCluster(4) # colocar 12 en server
-registerDoParallel(cl)  
+#cl <- makeCluster(4) # colocar 12 en server
+#registerDoParallel(cl)  
 
 
 RESUMEN <<- paste(Sys.time(),"--experimento.csv",sep="")
@@ -208,8 +218,8 @@ columnas <- paste("dataset","days","ncol","nrow","config_train","alg","score",
 #"ntrain", "ntest",
 write(columnas,file=RESUMEN)
 
-foreach(j = 1:3,.packages = packages) %dopar% 
-#for(j in 1:3) # POR cada uno de los datasets
+#foreach(j = 1:3,.packages = packages) %dopar% 
+for(j in 3:3) # POR cada uno de los datasets
 {
  # traigo dataset 
   dd <-get.dataset(dataset[j])
@@ -217,8 +227,8 @@ foreach(j = 1:3,.packages = packages) %dopar%
   pred_sensores_base <- dd$pred
   cat("DATASET ",dd$name,"\n")
   
-  foreach(t = 1:length(period),.packages = packages) %dopar% 
-  #for(t in 1:length(period))
+  #foreach(t = 1:length(period),.packages = packages) %dopar% 
+  for(t in 1:length(period))
   {
     #row <- cbind.data.frame(row,t)
     #file.name <- paste(file.name,t,sep = "--")
@@ -234,15 +244,15 @@ foreach(j = 1:3,.packages = packages) %dopar%
     bl <- get_blacklist(pred_sensores)
     wl <- get_whitelist(pred_sensores,colnames(df))
 
-    foreach(a = 1:length(alg),.packages = packages) %dopar% 
-    #for(a in 1:length(alg))
+    #foreach(a = 1:length(alg),.packages = packages) %dopar% 
+    for(a in 1:length(alg))
     {
-      foreach(s = 1:length(score),.packages = packages) %dopar%   
-      #for(s in 1:length(score))
+      #foreach(s = 1:length(score),.packages = packages) %dopar%   
+      for(s in 1:length(score))
       {
         
-        foreach(c = 1:length(config.train),.packages = packages) %dopar%        
-        #  for(c in 1:length(config.train))
+        #foreach(c = 1:length(config.train),.packages = packages) %dopar%        
+          for(c in 1:length(config.train))
           {
             u <- NULL
             #' ### Training set y test dataset
