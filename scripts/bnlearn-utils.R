@@ -3,6 +3,21 @@ library(bnlearn)
 library(forecast)
 library(caret)
 
+
+#' Function
+#' 
+
+require(graph)
+require(igraph)
+bn2igraph <- function(g.bn){
+   g <- igraph.from.graphNEL(as.graphNEL(g.bn))
+}
+
+test.plot <- function(){
+  
+  load(file="~/phd-repos/tmin/bnlearn/scripts/results/dacc--1--smote--hc--aic-g--bn.RData")
+}
+
 #' blacklist: las variables predictoras no pueden conectarse entre ellas
 #' Recibe un array (pred_sensores) con nombres de variables, es decir, cada elemento del array es un string.
 #' Regresa un dataframe con campos from y to.
