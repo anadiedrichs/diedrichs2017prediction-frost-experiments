@@ -62,10 +62,10 @@ dacc.spring <- function(){
   dd <- dfx[.indexmon(dfx) %in% c(7,8,10,11),] # mes agosto, setiembre, octubre, noviembre
   d1 <- data.frame(date=index(dd), coredata(dd))
   
-  return(list(data = d1, pred = d$pred_sensores, name="dacc-spring"))
+  return(list(data = d1, pred = d$pred, name="dacc-spring"))
 }
 
-# probar
+# probado
 dacc.temp <- function()
 {
   d <- dacc()
@@ -77,7 +77,7 @@ dacc.temp <- function()
   h <- colnames(data)[grepl("Hm", colnames(data))]
   data <- data[,-which(names(data) %in% h)]
   
-  return(list(data = data, pred = d$pred_sensores, name="dacc-temp"))
+  return(list(data = data, pred = d$pred, name="dacc-temp"))
 }
 
 
