@@ -50,7 +50,7 @@ dacc <- function()
   return(list(data=sensores, pred= pred_sensores,name="dacc"))
 }
 
-# 
+# tested
 dacc.spring <- function(){
   
   d <- dacc()
