@@ -219,7 +219,7 @@ columnas <- paste("dataset","days","ncol","nrow","config_train","alg","score",
 write(columnas,file=RESUMEN)
 
 #foreach(j = 1:3,.packages = packages) %dopar% 
-for(j in 3:3) # POR cada uno de los datasets
+for(j in 2:3) # POR cada uno de los datasets
 {
  # traigo dataset 
   dd <-get.dataset(dataset[j])
