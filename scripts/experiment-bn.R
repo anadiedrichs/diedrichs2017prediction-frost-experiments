@@ -207,9 +207,11 @@ learn.bayes <- function(df, wl=NULL,bl=NULL,alg="hc",sc="bic")
 }
 
 
-#cl <- makeCluster(4) # colocar 12 en server
+cl <- makeCluster(4) # colocar 12 en server
 #registerDoParallel(cl)  
 
+library(doMC)
+registerDoMC(4)
 
 RESUMEN <<- paste(Sys.time(),"--experimento.csv",sep="")
 columnas <- paste("dataset","days","ncol","nrow","config_train","alg","score",
@@ -218,8 +220,8 @@ columnas <- paste("dataset","days","ncol","nrow","config_train","alg","score",
 #"ntrain", "ntest",
 write(columnas,file=RESUMEN)
 
-#foreach(j = 1:3,.packages = packages) %dopar% 
-for(j in 2:3) # POR cada uno de los datasets
+foreach(j = 1:3,.packages = packages) %dopar% 
+#for(j in 2:3) # POR cada uno de los datasets
 {
  # traigo dataset 
   dd <-get.dataset(dataset[j])
@@ -227,9 +229,10 @@ for(j in 2:3) # POR cada uno de los datasets
   pred_sensores_base <- dd$pred
   cat("DATASET ",dd$name,"\n")
   
-  #foreach(t = 1:length(period),.packages = packages) %dopar% 
-  for(t in 1:length(period))
+  foreach(t = 1:length(period),.packages = packages) %dopar% 
+  #for(t in 1:length(period))
   {
+    cat("Period ",t)
     #row <- cbind.data.frame(row,t)
     #file.name <- paste(file.name,t,sep = "--")
     #' Obtengo dataset con variables desfasadas a t dias 
@@ -244,15 +247,16 @@ for(j in 2:3) # POR cada uno de los datasets
     bl <- get_blacklist(pred_sensores)
     wl <- get_whitelist(pred_sensores,colnames(df))
 
-    #foreach(a = 1:length(alg),.packages = packages) %dopar% 
-    for(a in 1:length(alg))
+    foreach(a = 1:length(alg),.packages = packages) %dopar% 
+    #for(a in 1:length(alg))
     {
-      #foreach(s = 1:length(score),.packages = packages) %dopar%   
-      for(s in 1:length(score))
+      cat("Alg ",alg[a])
+      foreach(s = 1:length(score),.packages = packages) %dopar%   
+      #for(s in 1:length(score))
       {
-        
-        #foreach(c = 1:length(config.train),.packages = packages) %dopar%        
-          for(c in 1:length(config.train))
+        cat("Score ",score[s])
+        foreach(c = 1:length(config.train),.packages = packages) %dopar%        
+          #for(c in 1:length(config.train))
           {
             u <- NULL
             #' ### Training set y test dataset
