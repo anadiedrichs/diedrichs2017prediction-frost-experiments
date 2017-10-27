@@ -158,7 +158,7 @@ trainingSMOTE <- function(df,alg,sc, file.name, var, fila,p=0.68)
   write.csv(x = dataset,file = paste("./results/",f,"--Y-vs-Y_pred.csv",sep = ""))
   
   
-  if(length(is.na(pred))<1){
+  if(length(which(is.na(pred)==TRUE))<1){ #si la predicción regresó NA, el fitted no pudo ser calculado 
   
     #evaluar resultados en testeo
     eee <- evaluate(pred,test.set[,var])
@@ -208,10 +208,10 @@ learn.bayes <- function(df, wl=NULL,bl=NULL,alg="hc",sc="bic")
 
 
 cl <- makeCluster(4) # colocar 12 en server
-#registerDoParallel(cl)  
+registerDoParallel(cl)  
 
-library(doMC)
-registerDoMC(4)
+#library(doMC)
+#registerDoMC(4)
 
 RESUMEN <<- paste(Sys.time(),"--experimento.csv",sep="")
 columnas <- paste("dataset","days","ncol","nrow","config_train","alg","score",
@@ -220,7 +220,7 @@ columnas <- paste("dataset","days","ncol","nrow","config_train","alg","score",
 #"ntrain", "ntest",
 write(columnas,file=RESUMEN)
 
-foreach(j = 1:3,.packages = packages) %dopar% 
+foreach(j = 2:3,.packages = packages) %dopar% # volver 2 como 1 para correr dataset dacc
 #for(j in 2:3) # POR cada uno de los datasets
 {
  # traigo dataset 
@@ -255,8 +255,8 @@ foreach(j = 1:3,.packages = packages) %dopar%
       #for(s in 1:length(score))
       {
         cat("Score ",score[s])
-        foreach(c = 1:length(config.train),.packages = packages) %dopar%        
-          #for(c in 1:length(config.train))
+        foreach(c = 2:length(config.train),.packages = packages) %dopar%  # solo corro SMOTE, volver 2 como 1 para rollback
+        # for(c in 1:length(config.train))
           {
             u <- NULL
             #' ### Training set y test dataset
@@ -287,9 +287,6 @@ foreach(j = 1:3,.packages = packages) %dopar%
   }#for por T
 }# for por dataset
 
-#system.time(foreach(i=1:10000) %dopar% sum(tanh(1:i)))  
-#   user  system elapsed 
-#  3.392   0.193   3.664 
 stopCluster(cl)
 
 # no correr!! es solo codigo copypaste
