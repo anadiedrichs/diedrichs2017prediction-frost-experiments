@@ -28,9 +28,11 @@ split.train <- 0.68 # porcentaje de datos en el dataset de entremaniento
 
 dataset <- c("dacc","dacc-temp","dacc-spring") #"dacc",
 config.train <-c("normal","smote")
-#' VEC si considera solo informacion de la misma estacion ("solo") o todas las variables
-vec <- c("vec") #TODO ,"solo"
-alg <- c("hc","tabu")
+
+# local: configuracion para armar red bayesiana con sólo las variables locales, de la propia estación
+alg <- c("local") 
+#alg <- c("hc","tabu","local") 
+
 #' T cuantos dias anteriores tomamos
 period <- c(1,2,3,4,5)
 
@@ -64,6 +66,46 @@ evaluate <- function(pred, obs) #tested
   return(list(rmse = rmse, r2 = r2, sens= sens, spec= spec, prec= p, acc= acc))
 }
 
+trainingNormalOneVar <- function(df,alg,sc, file.name, var, fila,p=0.68)
+{
+  until <- round(nrow(df)*p)
+  training.set = df[1:until-1, ] # This is training set to learn the parameters
+  test.set = df[until:nrow(df), ]
+  
+  rr <- learn.bayes(training.set, wl,bl,alg=alg,sc=sc,var=var)
+  res = rr$model
+  save(res, file = paste(file.name,"--bn.RData",sep="")) #,Sys.time()
+  
+  #' Aprendizaje de parametros
+  #'
+  variables <- c(as.character(unique(wl[which(wl$to== var),"from"])),var)
+  start_time <- Sys.time()
+  fitted = bn.fit(rr$model, training.set[variables])     # learning of parameters
+  end_time <- Sys.time()
+  fitted.time <- round(as.numeric(difftime(end_time, start_time, units = "secs")),3)
+  save(fitted, file = paste(file.name,"--fitted.RData",sep="")) #,Sys.time()
+  #' guardo modelo para más análisis o corridas posteriores
+  
+  
+  # nombre variable a predecir
+  f <- paste(file.name,var,sep="--")
+  #row <- c(row,pred_sensores[p]) 
+  # prediccion
+  pred = predict(fitted, var, test.set[variables])
+  # guardar csv con valor real vs predicho
+  dataset <- as.data.frame(cbind(test.set[var],pred))
+  colnames(dataset)<- c("y_real","y_pred")
+  write.csv(x = dataset,file = paste("./results/",f,"--Y-vs-Y_pred.csv",sep = ""))
+  #evaluar resultados en testeo
+  eee <- evaluate(pred,test.set[,var])
+  #guardo detalles del experimento
+  row <- paste(fila,rr$time,fitted.time,NA,nrow(training.set),NA,var,
+               eee$rmse,eee$r2,eee$sens,eee$acc,eee$prec,eee$spec,sep=",")
+  write(row, file=RESUMEN, append = TRUE)
+  
+  
+  return()
+}
 
 trainingNormal <- function(df,alg,sc, file.name, pred_sensores, fila,p=0.68)
 {
@@ -118,8 +160,8 @@ trainingSMOTE <- function(df,alg,sc, file.name, var, fila,p=0.68)
   
   #' Me enfoco en el caso de una sola estación junin, por lo que analizaremos solo la predicción sobre la misma....
   Y_class <- as.factor(with(df,ifelse(df[,var] <= 0,1,0)))
-  summary(Y_class)
-  summary(Y_class[until:length(Y_class)])
+  #summary(Y_class)
+  #summary(Y_class[until:length(Y_class)])
 
   #' datos para entrenar
   data_smote <- ubBalance(training.set,Y_class[1:(until-1)],type = "ubSMOTE",percOver = 300, percUnder = 150)
@@ -134,19 +176,20 @@ trainingSMOTE <- function(df,alg,sc, file.name, var, fila,p=0.68)
   nfrost <- length(data_smote$X[data_smote$X[,var] <= 0,var])
   
   
-  rr <- learn.bayes(training.set, wl,bl,alg=alg,sc=sc)
+  rr <- learn.bayes(training.set, wl,bl,alg=alg,sc=sc,var=var)
   res = rr$model
   save(res, file = paste(file.name,"--bn.RData",sep="")) #,Sys.time()
   
   #' Aprendizaje de parametros
-  #'
+  variables <- c(as.character(unique(wl[which(wl$to== var),"from"])),var)
+  
   start_time <- Sys.time()
-  fitted = bn.fit(rr$model, training.set)     # learning of parameters
+  if(alg=="local"){fitted = bn.fit(rr$model, training.set[variables])}
+  else fitted = bn.fit(rr$model, training.set)
   end_time <- Sys.time()
   fitted.time <- round(as.numeric(end_time-start_time),3)
   save(fitted, file = paste(file.name,"--fitted.RData",sep="")) #,Sys.time()
-  print(file.name)
-
+  
   # nombre variable a predecir
   f <- paste(file.name,var,sep="--")
   #row <- c(row,pred_sensores[p]) 
@@ -181,7 +224,7 @@ trainingSMOTE <- function(df,alg,sc, file.name, var, fila,p=0.68)
 
 #' funcion de aprendizaje bayesiano variables continuas
 #' probada
-learn.bayes <- function(df, wl=NULL,bl=NULL,alg="hc",sc="bic")
+learn.bayes <- function(df, wl=NULL,bl=NULL,alg="hc",sc="bic",var=NULL)
 {
   time = NULL; res = NULL
   if(!which(sc %in% score)) stop("score inexistente en learn.bayes")
@@ -200,12 +243,20 @@ learn.bayes <- function(df, wl=NULL,bl=NULL,alg="hc",sc="bic")
     end_time <- Sys.time()
     time = round(as.numeric(difftime(end_time, start_time, units = "secs")),3)
     
+  }else if(alg=="local")
+  {
+    if(is.null(var) || is.null(wl)) stop("var and wl must not be NULL in learn.bayes function")
+    # recuperar variables relacionadas con el sensor
+    variables <- c(as.character(unique(wl[which(wl$to== var),"from"])),var)
+    res = empty.graph(variables)
+    #class(e)
+    arcs(res) <- sapply(wl[which(wl$to== var),],as.character)
+    time = 0
   }
   
   return(list(model=res, time = round(as.numeric(time),3)))
   
 }
-
 
 cl <- makeCluster(4) # colocar 12 en server
 registerDoParallel(cl)  
@@ -221,7 +272,7 @@ columnas <- paste("dataset","days","ncol","nrow","config_train","alg","score",
 write(columnas,file=RESUMEN)
 
 foreach(j = 2:3,.packages = packages) %dopar% # volver 2 como 1 para correr dataset dacc
-#for(j in 2:3) # POR cada uno de los datasets
+#for(j in 1:3) # POR cada uno de los datasets
 {
  # traigo dataset 
   dd <-get.dataset(dataset[j])
@@ -244,46 +295,57 @@ foreach(j = 2:3,.packages = packages) %dopar% # volver 2 como 1 para correr data
     #guardar este dataset desfasado en T
     if(SAVE_DATASET){  write.csv(aux$data,paste(paste(dd$name,t,sep = "--"),"dataset.csv",sep="--"))  }
     
-    bl <- get_blacklist(pred_sensores)
-    wl <- get_whitelist(pred_sensores,colnames(df))
+    bl <<- get_blacklist(pred_sensores)
+    wl <<- get_whitelist(pred_sensores,colnames(df))
 
-    foreach(a = 1:length(alg),.packages = packages) %dopar% 
-    #for(a in 1:length(alg))
+    #foreach(a = 1:length(alg),.packages = packages) %dopar% 
+    for(a in 1:length(alg))
     {
       cat("Alg ",alg[a])
-      foreach(s = 1:length(score),.packages = packages) %dopar%   
-      #for(s in 1:length(score))
-      {
-        cat("Score ",score[s])
-        foreach(c = 2:length(config.train),.packages = packages) %dopar%  # solo corro SMOTE, volver 2 como 1 para rollback
-        # for(c in 1:length(config.train))
+      
+        #foreach(s = 1:length(score),.packages = packages) %dopar%   
+        for(s in 1:length(score))
+         {
+           cat("Score ",score[s])
+          #foreach(c = 2:length(config.train),.packages = packages) %dopar%  # solo corro SMOTE, volver 2 como 1 para rollback
+          for(c in 1:length(config.train))
           {
             u <- NULL
             #' ### Training set y test dataset
             df[,1:ncol(df)] <- lapply(df[,1:ncol(df)],as.numeric) # <- convertir a numeric
             file.name <- paste(dd$name,t,config.train[c],alg[a],score[s],sep = "--")
             
+            #caso vec o vecinos
             if(config.train[c]=="normal")
             {
-              
-              fila <- paste(dd$name,t,ncol(df),nrow(df),config.train[c],alg[a],score[s],sep=",")
-              
-              trainingNormal(df, alg=alg[a],sc=score[s], file.name = file.name, pred_sensores = pred_sensores , fila)
+              if(alg[a]=="local")
+              {
+                for(p in 1:length(pred_sensores))
+                {
+                  fila <- paste(dd$name,t,ncol(df),nrow(df),config.train[c],alg[a],score[s],sep=",")
+                  trainingNormalOneVar(df, alg=alg[a],sc=score[s], file.name = file.name, var = pred_sensores[p] , fila)
+                }
+              }else
+              {
+                fila <- paste(dd$name,t,ncol(df),nrow(df),config.train[c],alg[a],score[s],sep=",")
+                trainingNormal(df, alg=alg[a],sc=score[s], file.name = file.name, pred_sensores = pred_sensores , fila)
+              }
               
             }else if(config.train[c]=="smote")
             {
-              
               fila <- paste(dd$name,t,ncol(df),nrow(df),config.train[c],alg[a],score[s],sep=",")
-              
               for(p in 1:length(pred_sensores))
               {
                 trainingSMOTE(df, alg=alg[a],sc=score[s], file.name = file.name, var = pred_sensores[p], fila )
               }
             }
-          
           }# por training config 
-        }# for por score
-      }# for por algoritmo  
+          #TODO break this for if alg == local
+          
+          if(alg[a]=="local") break # salir de este for, solo dejamos que se ejecute una vez
+          
+        }# for por score 
+    }# for por algoritmo  
   }#for por T
 }# for por dataset
 
