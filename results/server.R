@@ -6,7 +6,7 @@ library(forecast)
 dataset <- c("dacc","dacc-temp","dacc-spring")
 config.train <-c("normal","smote")
 vec <- c("vec") #TODO ,"solo"
-alg <- c("hc","tabu")
+alg <- c("hc","tabu","local")
 period <- c(1,2,3,4,5)
 score <- c("bic-g","loglik-g","aic-g","bge")
 variables <- c("tunuyan.Tmin_t","las_paredes.Tmin_t","la_llave.Tmin_t","junin.Tmin_t","agua_amarga.Tmin_t")
