@@ -65,8 +65,8 @@ columnas <- paste("dataset","days","ncol","nrow","config_train","alg","ntree","m
 #"ntrain", "ntest",
 write(columnas,file=RESUMEN)
 
-#foreach(j = 1:length(dataset),.packages = packages) %dopar% # volver 2 como 1 para correr dataset dacc
-for(j in 1:length(dataset)) # POR cada uno de los datasets
+foreach(j = 1:length(dataset),.packages = packages) %dopar% # volver 2 como 1 para correr dataset dacc
+#for(j in 1:length(dataset)) # POR cada uno de los datasets
 {
  # traigo dataset 
   dd <-get.dataset(dataset[j])
@@ -74,8 +74,8 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
   pred_sensores_base <- dd$pred
   cat("DATASET ",dd$name,"\n")
   
-  #foreach(t = 1:length(period),.packages = packages) %dopar% 
-  for(t in 1:length(period))
+  foreach(t = 1:length(period),.packages = packages) %dopar% 
+  #for(t in 1:length(period))
   {
     cat("Period ",t)
     #row <- cbind.data.frame(row,t)
@@ -94,8 +94,8 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
     test.set = df[until:nrow(df), ]
     nfrost <- NA
     
-   # foreach(p = 1:length(pred_sensores),.packages = packages) %dopar% 
-    for(p in 1:length(pred_sensores))
+    foreach(p = 1:length(pred_sensores),.packages = packages) %dopar% 
+  #  for(p in 1:length(pred_sensores))
     {
       nfrostorig <- length(training.set[training.set[,pred_sensores[p]] <= 0,pred_sensores[p]])
       
@@ -165,7 +165,6 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
         }# por training config 
         
       }# por tunegrid parameters
-   
       
     }# for por cada sensor o estacion a predecir la minima   
   }#for por T
