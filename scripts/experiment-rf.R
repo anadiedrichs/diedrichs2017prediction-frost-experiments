@@ -30,7 +30,7 @@ period <- c(1,2,3,4,5)
 
 tunegrid <- expand.grid(.mtry=c(10:25),.ntree=seq(from=500,to=10000,by=500))
 # porcentaje para train set split
-p = 0.68
+porc_train = 0.68
 #' m = model or predicted values
 #' o = observed or real values
 #' 
@@ -65,7 +65,7 @@ columnas <- paste("dataset","days","ncol","nrow","config_train","alg","ntree","m
 #"ntrain", "ntest",
 write(columnas,file=RESUMEN)
 
-foreach(j = 1:length(dataset),.packages = packages) %dopar% # volver 2 como 1 para correr dataset dacc
+#foreach(j = 1:length(dataset),.packages = packages) %dopar% # volver 2 como 1 para correr dataset dacc
 for(j in 1:length(dataset)) # POR cada uno de los datasets
 {
  # traigo dataset 
@@ -74,7 +74,7 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
   pred_sensores_base <- dd$pred
   cat("DATASET ",dd$name,"\n")
   
-  foreach(t = 1:length(period),.packages = packages) %dopar% 
+  #foreach(t = 1:length(period),.packages = packages) %dopar% 
   for(t in 1:length(period))
   {
     cat("Period ",t)
@@ -86,28 +86,29 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
     pred_sensores <- aux$vars
     df <- aux$data
     
-    foreach(p = 1:length(pred_sensores),.packages = packages) %dopar% 
+    
+    #' ### Training set y test dataset
+    df[,1:ncol(df)] <- lapply(df[,1:ncol(df)],as.numeric) # <- convertir a numeric
+    until <- round(nrow(df)*porc_train)
+    training.set = df[1:until-1, ] # This is training set to learn the parameters
+    test.set = df[until:nrow(df), ]
+    nfrost <- NA
+    
+   # foreach(p = 1:length(pred_sensores),.packages = packages) %dopar% 
     for(p in 1:length(pred_sensores))
     {
-      foreach(u = 1:nrow(tunegrid),.packages = packages) %dopar% 
+      nfrostorig <- length(training.set[training.set[,pred_sensores[p]] <= 0,pred_sensores[p]])
+      
+    #  foreach(u = 1:nrow(tunegrid),.packages = packages) %dopar% 
       for(u in 1:nrow(tunegrid)){
         
         #foreach(c = 1:length(config.train),.packages = packages) %dopar%  # solo corro SMOTE, volver 2 como 1 para rollback
         for(c in 1:length(config.train))
         {
-          
-          #' ### Training set y test dataset
-          df[,1:ncol(df)] <- lapply(df[,1:ncol(df)],as.numeric) # <- convertir a numeric
-          
+          ts <- training.set
           fila <- paste(dd$name,t,ncol(df),nrow(df),config.train[c],"rf",
                         tunegrid[u,]$.ntree,tunegrid[u,]$.mtry,pred_sensores[p],sep=",")
           file.name <- paste(dd$name,t,config.train[c],"rf",tunegrid[u,]$.ntree,tunegrid[u,]$.mtry,pred_sensores[p],sep = "--")
-          
-          until <- round(nrow(df)*p)
-          training.set = df[1:until-1, ] # This is training set to learn the parameters
-          test.set = df[until:nrow(df), ]
-          nfrostorig <- length(training.set[training.set[,pred_sensores[p]] <= 0,pred_sensores[p]])
-          nfrost <- NA
           
           if(config.train[c]=="smote")
           {
@@ -115,31 +116,31 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
             Y_class <- as.factor(with(df,ifelse(df[,pred_sensores[p]] <= 0,1,0)))
             
             #' datos para entrenar
-            data_smote <- ubBalance(training.set,Y_class[1:(until-1)],type = "ubSMOTE",percOver = 300, percUnder = 150)
+            data_smote <- ubBalance(ts,Y_class[1:(until-1)],type = "ubSMOTE",percOver = 300, percUnder = 150)
             
             #guardar este dataset desfasado en T
             if(SAVE_DATASET){  write.csv(data_smote$X,paste(paste(file.name,pred_sensores[p],"smote-dataset.csv",sep="--"))) }
             
             #' para visualizar la distribución de las clases
             summary(data_smote$Y)
-            training.set <- data_smote$X
+            ts <- data_smote$X
             nfrost <- length(data_smote$X[data_smote$X[,pred_sensores[p]] <= 0,pred_sensores[p]])
             
           }
           
           # renombrar variable predictora a y
           y_label <- pred_sensores[p]
-          df2 <- training.set
+          #ts <- training.set
           #' renombro variable predictora por y, para facilitar formula 
-          colnames(df2)[which(colnames(df2)==y_label)] <- "y"
+          colnames(ts)[which(colnames(ts)==y_label)] <- "y"
           #' quito las otras variables predictoras, ya que solo analizaré la que se encuentre en y_label
           #' 
-          df2 <- df2[,-which(names(df2) %in% pred_sensores)]
-          #colnames(df2)
+          ts <- ts[,-which(names(ts) %in% pred_sensores)]
+          #colnames(ts)
           
           # random forest
           start_time <- Sys.time()
-          model <- randomForest(y ~ ., data = df2, importance = TRUE, keep.forest=TRUE, 
+          model <- randomForest(y ~ ., data = ts, importance = TRUE, keep.forest=TRUE, 
                                 ntree=tunegrid[u,]$.ntree, mtry=tunegrid[u,]$.mtry)
           end_time <- Sys.time()
           timerf <- round(as.numeric(difftime(end_time, start_time, units = "secs")),3)
