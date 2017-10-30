@@ -26,12 +26,12 @@ split.train <- 0.68 # porcentaje de datos en el dataset de entremaniento
 
 ################
 
-dataset <- c("dacc","dacc-temp","dacc-spring") #"dacc",
+dataset <- c("dacc","dacc-temp","dacc-spring") 
 config.train <-c("normal","smote")
 
 # local: configuracion para armar red bayesiana con sólo las variables locales, de la propia estación
-alg <- c("local") 
-#alg <- c("hc","tabu","local") 
+#alg <- c("local") 
+alg <- c("hc","tabu","local") 
 
 #' T cuantos dias anteriores tomamos
 period <- c(1,2,3,4,5)
@@ -271,8 +271,8 @@ columnas <- paste("dataset","days","ncol","nrow","config_train","alg","score",
 #"ntrain", "ntest",
 write(columnas,file=RESUMEN)
 
-foreach(j = 2:3,.packages = packages) %dopar% # volver 2 como 1 para correr dataset dacc
-#for(j in 1:3) # POR cada uno de los datasets
+foreach(j = 1:3,.packages = packages) %dopar% # volver 2 como 1 para correr dataset dacc
+#for(j in 1:length(dataset)) # POR cada uno de los datasets
 {
  # traigo dataset 
   dd <-get.dataset(dataset[j])
@@ -297,9 +297,9 @@ foreach(j = 2:3,.packages = packages) %dopar% # volver 2 como 1 para correr data
     
     bl <<- get_blacklist(pred_sensores)
     wl <<- get_whitelist(pred_sensores,colnames(df))
-
-    #foreach(a = 1:length(alg),.packages = packages) %dopar% 
-    for(a in 1:length(alg))
+    print(wl)
+    foreach(a = 1:length(alg),.packages = packages) %dopar% 
+    #for(a in 1:length(alg))
     {
       cat("Alg ",alg[a])
       

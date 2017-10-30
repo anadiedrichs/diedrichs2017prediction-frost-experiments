@@ -20,13 +20,63 @@ dataset <- c("dacc","dacc-temp","dacc-spring")
 
 get.dataset <- function(d)
 {
-  if(d==dataset[1]) return(dacc())
-  else if(d==dataset[2]) return(dacc.temp())
-  else if(d==dataset[3]) return(dacc.spring())
+  if(d==dataset[1]) return(dacc_v2())
+  else if(d==dataset[2]) return(dacc.temp_v2())
+  else if(d==dataset[3]) return(dacc.spring_v2())
   else stop("ERROR get.dataset, you muss pass the correct argument value")
 }
 
 # probado
+dacc_v2 <- function()
+{
+  
+  sensores <- suppressWarnings(read_csv("~/phd-repos/tmin/bnlearn/data/dacc-daily-tmin.csv"))
+  
+  #' Columnas a borrar "X1" 
+  sensores <- sensores[-1]
+  
+  #' como denomino a las variables que quiero predecir
+  pred_sensores <- colnames(sensores)[c(7,14,21,28,35)]
+  
+  #' quito radiación, no la he usado en planteo original y hay valores muy negativos, extraños
+  h <- colnames(sensores)[grepl("radiacion", colnames(sensores))]
+  sensores <- sensores[,-which(names(sensores) %in% h)]
+  
+  return(list(data=sensores, pred= pred_sensores,name="dacc"))
+  
+}
+#tested
+dacc.spring_v2 <- function()
+{
+  
+  d <- dacc_v2()
+  data <- d$data
+  
+  #' Variables del dataset
+  #' 
+  dfx <- xts(data[3:ncol(data)], order.by=as.Date(strptime(data$date,"%Y-%m-%d")))
+  dd <- dfx[.indexmon(dfx) %in% c(7,8,9,10),] # mes agosto, setiembre, octubre, noviembre #BUG me incluia diciembre y el 20xx-01-01 , solved
+  d1 <- data.frame(date=index(dd), coredata(dd))
+  
+  return(list(data = d1, pred = d$pred, name="dacc-spring"))
+}
+
+dacc.temp_v2 <- function()
+{
+  d <- dacc_v2()
+  data <- d$data
+  
+  #' Quitar columnas de humedad
+  #' las columnas con humedad tienen los caracteres Hm
+  #' 
+  h <- colnames(data)[grepl("humedad", colnames(data))]
+  data <- data[,-which(names(data) %in% h)]
+  
+  return(list(data = data, pred = d$pred, name="dacc-temp"))
+}
+
+# probado
+# deprecated at 30 oct 2017
 dacc <- function()
 {
   
@@ -51,6 +101,7 @@ dacc <- function()
 }
 
 # tested
+# deprecated at 30 oct 2017
 dacc.spring <- function(){
   
   d <- dacc()
@@ -66,6 +117,7 @@ dacc.spring <- function(){
 }
 
 # probado
+# deprecated at 30 oct 2017
 dacc.temp <- function()
 {
   d <- dacc()
