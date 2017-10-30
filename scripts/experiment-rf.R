@@ -65,7 +65,7 @@ columnas <- paste("dataset","days","ncol","nrow","config_train","alg","ntree","m
 #"ntrain", "ntest",
 write(columnas,file=RESUMEN)
 
-#foreach(j = 1:3,.packages = packages) %dopar% # volver 2 como 1 para correr dataset dacc
+foreach(j = 1:length(dataset),.packages = packages) %dopar% # volver 2 como 1 para correr dataset dacc
 for(j in 1:length(dataset)) # POR cada uno de los datasets
 {
  # traigo dataset 
@@ -74,7 +74,7 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
   pred_sensores_base <- dd$pred
   cat("DATASET ",dd$name,"\n")
   
-  #foreach(t = 1:length(period),.packages = packages) %dopar% 
+  foreach(t = 1:length(period),.packages = packages) %dopar% 
   for(t in 1:length(period))
   {
     cat("Period ",t)
@@ -86,13 +86,13 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
     pred_sensores <- aux$vars
     df <- aux$data
     
-    #foreach(a = 1:length(alg),.packages = packages) %dopar% 
+    foreach(p = 1:length(pred_sensores),.packages = packages) %dopar% 
     for(p in 1:length(pred_sensores))
     {
-      #foreach(a = 1:length(alg),.packages = packages) %dopar% 
+      foreach(u = 1:nrow(tunegrid),.packages = packages) %dopar% 
       for(u in 1:nrow(tunegrid)){
         
-        #foreach(c = 2:length(config.train),.packages = packages) %dopar%  # solo corro SMOTE, volver 2 como 1 para rollback
+        #foreach(c = 1:length(config.train),.packages = packages) %dopar%  # solo corro SMOTE, volver 2 como 1 para rollback
         for(c in 1:length(config.train))
         {
           
@@ -163,7 +163,7 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
           
         }# por training config 
         
-      }
+      }# por tunegrid parameters
    
       
     }# for por cada sensor o estacion a predecir la minima   
