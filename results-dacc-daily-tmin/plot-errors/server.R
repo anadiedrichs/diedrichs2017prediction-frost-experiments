@@ -2,6 +2,7 @@ source("ui.R")
 
 library(caret)
 library(forecast)
+library(readr)
 
 dataset <- c("dacc","dacc-temp","dacc-spring")
 config.train <-c("normal","smote")
@@ -9,7 +10,7 @@ vec <- c("vec") #TODO ,"solo"
 alg <- c("hc","tabu","local")
 period <- c(1,2,3,4,5)
 score <- c("bic-g","loglik-g","aic-g","bge")
-variables <- c("tunuyan.Tmin_t","las_paredes.Tmin_t","la_llave.Tmin_t","junin.Tmin_t","agua_amarga.Tmin_t")
+variables <- c("tunuyan.temp_min_t","las_paredes.temp_min_t","la_llave.temp_min_t","junin.temp_min_t","agua_amarga.temp_min_t")
 lista <- list.files(path=".",pattern="*.csv")
 
 function(input, output, session){
@@ -54,9 +55,9 @@ function(input, output, session){
     
     if(is.null(input$variable)){return()}
     findthis <- paste(input$dataset,input$T,input$config,input$alg,input$score,input$variable,sep = "--")
-    archivo <- read.csv(lista[grep(findthis, lista,fixed=TRUE)])
+    archivo <- read_csv(lista[grep(findthis, lista,fixed=TRUE)])
     #cumm <- cumm[-1] #quito la primer columna nombre x
-    model$data <- archivo
+    model$data <- sapply(archivo,as.numeric)
     return(archivo)
   })
   
@@ -88,13 +89,13 @@ function(input, output, session){
     
     if(is.null(model) || is.null(model$data)){return()}
     p <- plot_ly() %>%
-         add_trace( x = model$data$X, y = model$data[,2], mode = "lines",name=colnames(model$data)[2]) %>%
-         add_trace(p, x = model$data$X, y = model$data[,3], mode = "lines",name=colnames(model$data)[3])
+         add_trace( x = model$data[,1], y = model$data[,2], mode = "lines",name=colnames(model$data)[2]) %>%
+         add_trace(p, x = model$data[,1], y = model$data[,3], mode = "lines",name=colnames(model$data)[3])
   
     p
   })
   
-  #TODO
+  #
   output$errors <- renderDataTable({
     
     if(is.null(model) || is.null(model$data)){return()}
@@ -112,7 +113,7 @@ function(input, output, session){
     breaks <- c(-20,0,50) # caso Helada y no helada
     y <- cut(model$data[,2], breaks = breaks)
     y_pred <- cut(model$data[,3], breaks = breaks)
-    confusionMatrix(y_pred,y)
+    confusionMatrix(y_pred,y,mode="everything")
     
   })
   
@@ -124,7 +125,7 @@ function(input, output, session){
      breaks <- c(-20,-5,0,2,5,10,50) # caso Helada y no helada
     y <- cut(model$data[,2], breaks = breaks)
     y_pred <- cut(model$data[,3], breaks = breaks)
-    c <- confusionMatrix(y_pred,y)
+    c <- confusionMatrix(y_pred,y,mode="everything")
     c
   })
   # diff <- abs(round(y - pred,2))

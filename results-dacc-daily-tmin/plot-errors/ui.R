@@ -1,6 +1,5 @@
 library(shiny)
 library(plotly)
-library(ggplot2)
 
 file <- NULL
 cumm <- NULL
