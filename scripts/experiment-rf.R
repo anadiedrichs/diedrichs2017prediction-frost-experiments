@@ -1,5 +1,5 @@
 #'
-#' 
+#' TODO actualizar este comment
 #' FORMATO NOMBRE DE ARCHIVO SALIDA
 #' <dataset>-<variable>-<T period en numero>-<S o N, S para SMOTE y N normal>-<H humedad incluida, N no incluida>-<algoritmo>-<score>
 
@@ -19,16 +19,11 @@ packages <- c("randomForest","caret","forecast","unbalanced","readr","xts","time
 
 SAVE_DATASET <- TRUE
 split.train <- 0.68 # porcentaje de datos en el dataset de entremaniento
-
-################
-
 dataset <- c("dacc","dacc-temp","dacc-spring") 
 config.train <-c("normal","smote")
-
 #' T cuantos dias anteriores tomamos
 period <- c(1,2,3,4,5)
-
-tunegrid <- expand.grid(.mtry=c(10:25),.ntree=seq(from=500,to=10000,by=500))
+tunegrid <- expand.grid(.mtry=c(10:25),.ntree=seq(from=500,to=3500,by=500))
 # porcentaje para train set split
 porc_train = 0.68
 #' m = model or predicted values
@@ -54,8 +49,15 @@ evaluate <- function(pred, obs) #tested
   return(list(rmse = rmse, r2 = r2, sens= sens, spec= spec, prec= p, acc= acc))
 }
 
-cl <- makeCluster(4) # colocar 12 en server
-registerDoParallel(cl)  
+#log.socket <- make.socket(port=4000)
+Log <- function(text, ...) {
+  msg <- sprintf(paste0(as.character(Sys.time()), ": ", text, "\n"), ...)
+  cat(msg)
+  #write.socket(log.socket, msg)
+}
+
+cl <- makeCluster(4,outfile=paste("output-rf-",Sys.time(),".log",sep="")) # colocar 12 en server
+registerDoParallel(cl)
 
 
 RESUMEN <<- paste(Sys.time(),"--rf--experimento.csv",sep="")
@@ -65,19 +67,19 @@ columnas <- paste("dataset","days","ncol","nrow","config_train","alg","ntree","m
 #"ntrain", "ntest",
 write(columnas,file=RESUMEN)
 
-foreach(j = 1:length(dataset),.packages = packages) %dopar% # volver 2 como 1 para correr dataset dacc
+foreach(j = 1:length(dataset),.packages = packages) %dopar% # comentar para correr en modo debug o rstudio y descomentar linea de abajo
 #for(j in 1:length(dataset)) # POR cada uno de los datasets
 {
  # traigo dataset 
   dd <-get.dataset(dataset[j])
   sensores <- dd$data[-1] #quito columna date o primer columna
   pred_sensores_base <- dd$pred
-  cat("DATASET ",dd$name,"\n")
+  Log("DATASET ",dd$name)
   
   foreach(t = 1:length(period),.packages = packages) %dopar% 
   #for(t in 1:length(period))
   {
-    cat("Period ",t)
+    Log("Period ",t)
     #row <- cbind.data.frame(row,t)
     #file.name <- paste(file.name,t,sep = "--")
     #' Obtengo dataset con variables desfasadas a t dias 
@@ -85,7 +87,6 @@ foreach(j = 1:length(dataset),.packages = packages) %dopar% # volver 2 como 1 pa
     aux <- desfasar.dataset.T(t,sensores, pred_sensores_base)
     pred_sensores <- aux$vars
     df <- aux$data
-    
     
     #' ### Training set y test dataset
     df[,1:ncol(df)] <- lapply(df[,1:ncol(df)],as.numeric) # <- convertir a numeric
@@ -95,12 +96,14 @@ foreach(j = 1:length(dataset),.packages = packages) %dopar% # volver 2 como 1 pa
     nfrost <- NA
     
     foreach(p = 1:length(pred_sensores),.packages = packages) %dopar% 
-  #  for(p in 1:length(pred_sensores))
+    #for(p in 2:length(pred_sensores)) #junin ya lo he realizado
     {
+      Log(pred_sensores[p])
       nfrostorig <- length(training.set[training.set[,pred_sensores[p]] <= 0,pred_sensores[p]])
       
-    #  foreach(u = 1:nrow(tunegrid),.packages = packages) %dopar% 
-      for(u in 1:nrow(tunegrid)){
+      foreach(u = 1:nrow(tunegrid),.packages = packages) %dopar% 
+      #for(u in 1:nrow(tunegrid))
+      {
         
         #foreach(c = 1:length(config.train),.packages = packages) %dopar%  # solo corro SMOTE, volver 2 como 1 para rollback
         for(c in 1:length(config.train))
@@ -125,7 +128,6 @@ foreach(j = 1:length(dataset),.packages = packages) %dopar% # volver 2 como 1 pa
             summary(data_smote$Y)
             ts <- data_smote$X
             nfrost <- length(data_smote$X[data_smote$X[,pred_sensores[p]] <= 0,pred_sensores[p]])
-            
           }
           
           # renombrar variable predictora a y
@@ -139,6 +141,9 @@ foreach(j = 1:length(dataset),.packages = packages) %dopar% # volver 2 como 1 pa
           #colnames(ts)
           
           # random forest
+          Log(fila)
+          Log(paste("starts random Forest learning mtry:",tunegrid[u,]$.mtry," ntree:",tunegrid[u,]$.ntree))
+          
           start_time <- Sys.time()
           model <- randomForest(y ~ ., data = ts, importance = TRUE, keep.forest=TRUE, 
                                 ntree=tunegrid[u,]$.ntree, mtry=tunegrid[u,]$.mtry)
@@ -147,7 +152,6 @@ foreach(j = 1:length(dataset),.packages = packages) %dopar% # volver 2 como 1 pa
           
           # guardar model
           save(model, file = paste(file.name,".RData",sep=""))
-          
           pred <- predict(model, test.set)
           
           # guardar csv con valor real vs predicho
@@ -161,6 +165,8 @@ foreach(j = 1:length(dataset),.packages = packages) %dopar% # volver 2 como 1 pa
           row <- paste(fila,timerf,nfrostorig,nrow(training.set),nfrost,
                        eee$rmse,eee$r2,eee$sens,eee$acc,eee$prec,eee$spec,sep=",")
           write(row, file=RESUMEN, append = TRUE)
+          
+          Log(row)
           
         }# por training config 
         
