@@ -17,7 +17,7 @@ set.seed(147)
 packages <- c("randomForest","caret","forecast","unbalanced","readr","xts","timeDate")
 # si quiero guardar los dataset desfasados para ser usados por otras librerías.
 
-SAVE_DATASET <- TRUE
+SAVE_DATASET <- FALSE
 split.train <- 0.68 # porcentaje de datos en el dataset de entremaniento
 dataset <- c("dacc","dacc-temp","dacc-spring") 
 config.train <-c("normal","smote")
@@ -95,7 +95,7 @@ foreach(j = 1:length(dataset),.packages = packages) %dopar% # comentar para corr
     test.set = df[until:nrow(df), ]
     nfrost <- NA
     
-    foreach(p = 1:length(pred_sensores),.packages = packages) %dopar% 
+    foreach(p = 2:length(pred_sensores),.packages = packages) %dopar% # arranca en 2 para evitar procesar junin
     #for(p in 2:length(pred_sensores)) #junin ya lo he realizado
     {
       Log(pred_sensores[p])
@@ -151,7 +151,7 @@ foreach(j = 1:length(dataset),.packages = packages) %dopar% # comentar para corr
           timerf <- round(as.numeric(difftime(end_time, start_time, units = "secs")),3)
           
           # guardar model
-          save(model, file = paste(file.name,".RData",sep=""))
+          save(model, file = paste("./models-rf/",file.name,".RData",sep=""),compress = TRUE)
           pred <- predict(model, test.set)
           
           # guardar csv con valor real vs predicho
