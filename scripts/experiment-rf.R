@@ -59,7 +59,7 @@ registerDoParallel(cl)
 
 
 RESUMEN <<- paste(Sys.time(),"--rf--experimento.csv",sep="")
-columnas <- paste("dataset","days","ncol","nrow","config_train","alg","ntree","mtry","var","ntree",
+columnas <- paste("dataset","days","ncol","nrow","config_train","alg","ntree","mtry","var",
                   "t_run_s","nfrostorig","ntrain","nfrostsmote",
                   "RMSE","r2","Sensitivity","Acc","Precision","Specificity",sep = ",")
 #"ntrain", "ntest",
