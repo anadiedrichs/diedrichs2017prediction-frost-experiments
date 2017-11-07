@@ -67,8 +67,8 @@ columnas <- paste("dataset","days","ncol","nrow","config_train","alg","ntree","m
 #"ntrain", "ntest",
 write(columnas,file=RESUMEN)
 
-#foreach(j = 1:length(dataset),.packages = packages) %dopar% # comentar para correr en modo debug o rstudio y descomentar linea de abajo
-for(j in 1:length(dataset)) # POR cada uno de los datasets
+foreach(j = 1:length(dataset),.packages = packages) %dopar% # comentar para correr en modo debug o rstudio y descomentar linea de abajo
+#for(j in 1:length(dataset)) # POR cada uno de los datasets
 {
  # traigo dataset 
   dd <-get.dataset(dataset[j])
@@ -76,8 +76,8 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
   pred_sensores_base <- dd$pred
   Log("DATASET ",dd$name)
   
-  #foreach(t = 1:length(period),.packages = packages) %dopar% 
-  for(t in 1:length(period))
+  foreach(t = 1:length(period),.packages = packages) %dopar% 
+  #for(t in 1:length(period))
   {
     Log("Period ",t)
     #row <- cbind.data.frame(row,t)
@@ -95,18 +95,18 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
     test.set = df[until:nrow(df), ]
     nfrost <- NA
     
-    #foreach(p = 2:length(pred_sensores),.packages = packages) %dopar% # arranca en 2 para evitar procesar junin
-    for(p in 2:length(pred_sensores)) #junin ya lo he realizado
+    foreach(p = 2:length(pred_sensores),.packages = packages) %dopar% # arranca en 2 para evitar procesar junin
+    #for(p in 2:length(pred_sensores)) #junin ya lo he realizado
     {
       Log(pred_sensores[p])
       nfrostorig <- length(training.set[training.set[,pred_sensores[p]] <= 0,pred_sensores[p]])
       
-    #  foreach(u = 1:nrow(tunegrid),.packages = packages) %dopar% 
-      for(u in 1:nrow(tunegrid))
+      foreach(u = 1:nrow(tunegrid),.packages = packages) %dopar% 
+    #  for(u in 1:nrow(tunegrid))
       {
         
-        #foreach(c = 1:length(config.train),.packages = packages) %dopar%  # solo corro SMOTE, volver 2 como 1 para rollback
-        for(c in 1:length(config.train))
+        foreach(c = 1:length(config.train),.packages = packages) %dopar%  # solo corro SMOTE, volver 2 como 1 para rollback
+        #for(c in 1:length(config.train))
         {
           ts <- training.set
           fila <- paste(dd$name,t,ncol(df),nrow(df),config.train[c],"rf",
