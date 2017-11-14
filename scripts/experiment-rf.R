@@ -16,8 +16,10 @@ set.seed(147)
 
 packages <- c("randomForest","caret","forecast","unbalanced","readr","xts","timeDate")
 # si quiero guardar los dataset desfasados para ser usados por otras librerías.
-
+LOCAL <- TRUE
+#
 SAVE_DATASET <- FALSE
+#
 split.train <- 0.68 # porcentaje de datos en el dataset de entremaniento
 dataset <- c("dacc","dacc-temp","dacc-spring") 
 config.train <-c("normal","smote")
@@ -49,6 +51,19 @@ evaluate <- function(pred, obs) #tested
   return(list(rmse = rmse, r2 = r2, sens= sens, spec= spec, prec= p, acc= acc))
 }
 
+#TODO testear
+# var: nombre variable a predecir,ejemplo *_tmin
+# variables: colnames o conjunto de variables del dataset
+vars.del.sensor <- function(var,variables,dataset_tmin_chaar=FALSE)
+{
+  v <- variables
+  sensor <- unlist(strsplit(var,split=".",fixed = TRUE))[1]
+  if(dataset_tmin_chaar==TRUE) sensor <- paste(sensor,".",sep="") # esto es lo diferente, por bug #
+  
+  vars <- v[grepl( sensor, v, fixed = TRUE)] # extraigo todas las variables relacionadas con sensor
+  #vars <- vars[-length(vars)] # quito la última variable min_t
+  return(vars)
+}
 #log.socket <- make.socket(port=4000)
 Log <- function(text, ...) {
   msg <- sprintf(paste0(as.character(Sys.time()), ": ", text, "\n"), ...)
@@ -56,8 +71,8 @@ Log <- function(text, ...) {
   #write.socket(log.socket, msg)
 }
 
-cl <- makeCluster(4,outfile=paste("output-rf-",Sys.time(),".log",sep="")) # colocar detectCores() en server  en vez de 4
-registerDoParallel(cl)
+#cl <- makeCluster(4,outfile=paste("output-rf-",Sys.time(),".log",sep="")) # colocar detectCores() en server  en vez de 4
+#registerDoParallel(cl)
 
 
 RESUMEN <<- paste(Sys.time(),"--rf--experimento.csv",sep="")
@@ -67,8 +82,8 @@ columnas <- paste("dataset","days","ncol","nrow","config_train","alg","ntree","m
 #"ntrain", "ntest",
 write(columnas,file=RESUMEN)
 
-foreach(j = 1:length(dataset),.packages = packages) %dopar% # comentar para correr en modo debug o rstudio y descomentar linea de abajo
-#for(j in 1:length(dataset)) # POR cada uno de los datasets
+#foreach(j = 1:length(dataset),.packages = packages) %dopar% # comentar para correr en modo debug o rstudio y descomentar linea de abajo
+for(j in 1:length(dataset)) # POR cada uno de los datasets
 {
  # traigo dataset 
   dd <-get.dataset(dataset[j])
@@ -76,8 +91,8 @@ foreach(j = 1:length(dataset),.packages = packages) %dopar% # comentar para corr
   pred_sensores_base <- dd$pred
   Log("DATASET ",dd$name)
   
-  foreach(t = 1:length(period),.packages = packages) %dopar% 
-  #for(t in 1:length(period))
+  #foreach(t = 1:length(period),.packages = packages) %dopar% 
+  for(t in 1:length(period))
   {
     Log("Period ",t)
     #row <- cbind.data.frame(row,t)
@@ -95,24 +110,23 @@ foreach(j = 1:length(dataset),.packages = packages) %dopar% # comentar para corr
     test.set = df[until:nrow(df), ]
     nfrost <- NA
     
-    foreach(p = 2:length(pred_sensores),.packages = packages) %dopar% # arranca en 2 para evitar procesar junin
-    #for(p in 2:length(pred_sensores)) #junin ya lo he realizado
+    #foreach(p = 1:length(pred_sensores),.packages = packages) %dopar% # arranca en 2 para evitar procesar junin
+    for(p in 1:length(pred_sensores)) #junin ya lo he realizado
     {
       Log(pred_sensores[p])
       nfrostorig <- length(training.set[training.set[,pred_sensores[p]] <= 0,pred_sensores[p]])
       
-      foreach(u = 1:nrow(tunegrid),.packages = packages) %dopar% 
-    #  for(u in 1:nrow(tunegrid))
+    #foreach(u = 1:nrow(tunegrid),.packages = packages) %dopar% 
+    #foreach(u = 1:length(unique(tunegrid$.ntree)),.packages = packages) %dopar%  # config LOCAL
+    for(u in 1:length(unique(tunegrid$.ntree)))  # CONFIG LOCAL
+       # for(u in 1:nrow(tunegrid))
       {
         
-        foreach(c = 1:length(config.train),.packages = packages) %dopar%  # solo corro SMOTE, volver 2 como 1 para rollback
-        #for(c in 1:length(config.train))
+        #foreach(c = 1:length(config.train),.packages = packages) %dopar%  # solo corro SMOTE, volver 2 como 1 para rollback
+        for(c in 1:length(config.train))
         {
           ts <- training.set
-          fila <- paste(dd$name,t,ncol(df),nrow(df),config.train[c],"rf",
-                        tunegrid[u,]$.ntree,tunegrid[u,]$.mtry,pred_sensores[p],sep=",")
-          file.name <- paste(dd$name,t,config.train[c],"rf",tunegrid[u,]$.ntree,tunegrid[u,]$.mtry,pred_sensores[p],sep = "--")
-          
+          test <- test.set
           if(config.train[c]=="smote")
           {
             #' Me enfoco en el caso de una sola estación 
@@ -121,48 +135,60 @@ foreach(j = 1:length(dataset),.packages = packages) %dopar% # comentar para corr
             #' datos para entrenar
             data_smote <- ubBalance(ts,Y_class[1:(until-1)],type = "ubSMOTE",percOver = 300, percUnder = 150)
             
-            #guardar este dataset desfasado en T
-            if(SAVE_DATASET){  write.csv(data_smote$X,paste(paste(file.name,pred_sensores[p],"smote-dataset.csv",sep="--"))) }
-            
             #' para visualizar la distribución de las clases
             summary(data_smote$Y)
             ts <- data_smote$X
             nfrost <- length(data_smote$X[data_smote$X[,pred_sensores[p]] <= 0,pred_sensores[p]])
           }
           
+          # config rf-local o rf-solo
+          if(LOCAL==TRUE)
+          {
+            vars <- vars.del.sensor(pred_sensores[p],colnames(training.set))
+            ts <- training.set[,vars]
+            test <- test.set[,vars]
+            fila <- paste(dd$name,t,ncol(df),nrow(df),config.train[c],"rf-local",
+                          tunegrid[u,]$.ntree,tunegrid[u,]$.mtry,pred_sensores[p],sep=",")
+            file.name <- paste(dd$name,t,config.train[c],"rf-local",unique(tunegrid$.ntree)[u],1,pred_sensores[p],sep = "--")
+            
+            Log(paste("starts random Forest learning ntree:",tunegrid[u,]$.ntree))
+          }else{
+            
+            ts <- training.set
+            fila <- paste(dd$name,t,ncol(df),nrow(df),config.train[c],"rf",
+                          tunegrid[u,]$.ntree,tunegrid[u,]$.mtry,pred_sensores[p],sep=",")
+            file.name <- paste(dd$name,t,config.train[c],"rf",tunegrid[u,]$.ntree,tunegrid[u,]$.mtry,pred_sensores[p],sep = "--")
+            
+            Log(paste("starts random Forest learning mtry:",tunegrid[u,]$.mtry," ntree:",tunegrid[u,]$.ntree))
+            # random forest
+          }
+          #guardar este dataset desfasado en T de smote
+          if(SAVE_DATASET && config.train[c]=="smote"){  write.csv(data_smote$X,paste(paste(file.name,pred_sensores[p],"smote-dataset.csv",sep="--"))) }
           
-          # renombrar variable predictora a y
-          #y_label <- pred_sensores[p]
-          #ts <- training.set
-          #' renombro variable predictora por y, para facilitar formula 
-          ###colnames(ts)[which(colnames(ts)==y_label)] <- "y"
-          #' quito las otras variables predictoras, ya que solo analizaré la que se encuentre en y_label
-         ### ts <- ts[,-which(names(ts) %in% pred_sensores)]
-          #colnames(ts)
-          
-          #prepare random forest test-set
-          #data <- test.set
-          #colnames(data)[which(colnames(data)==y_label)] <- "y"
-          #' quito las otras variables predictoras, ya que solo analizaré la que se encuentre en y_label
-          #data <- data[,-which(names(data) %in% pred_sensores)]
-          
+          Log(fila)
+        
           tryCatch({
             
-            # random forest
-            Log(fila)
-            Log(paste("starts random Forest learning mtry:",tunegrid[u,]$.mtry," ntree:",tunegrid[u,]$.ntree))
             
             start_time <- Sys.time()
             # model <- randomForest(y ~ ., data = ts, importance = TRUE, keep.forest=FALSE,proximity=FALSE,
             #                       do.trace=TRUE,
             #                       ntree=tunegrid[u,]$.ntree, mtry=tunegrid[u,]$.mtry)
             # 
-            model <- randomForest(x =ts[,-which(colnames(ts) %in% pred_sensores[p])] ,
-                                  y=ts[,pred_sensores[p]], 
-                                  importance = TRUE, keep.forest=TRUE,proximity=FALSE,
-                                  #ytest = test.set[,pred_sensores[p]],
-                                  #xtest=test.set[,-which(colnames(test.set) %in% pred_sensores[p])],
-                                  ntree=tunegrid[u,]$.ntree, mtry=tunegrid[u,]$.mtry)
+            if(LOCAL==TRUE)
+            {
+              
+              model <- randomForest(x =ts[,-which(colnames(ts) %in% pred_sensores[p])],
+                                    y=ts[,pred_sensores[p]], 
+                                    importance = TRUE, keep.forest=TRUE,proximity=FALSE,
+                                    ntree=unique(tunegrid$.ntree)[u])
+            }else{
+              
+              model <- randomForest(x =ts[,-which(colnames(ts) %in% pred_sensores[p])],
+                                    y=ts[,pred_sensores[p]], 
+                                    importance = TRUE, keep.forest=TRUE,proximity=FALSE,
+                                    ntree=tunegrid[u,]$.ntree, mtry=tunegrid[u,]$.mtry)
+            }
             
             end_time <- Sys.time()
             timerf <- round(as.numeric(difftime(end_time, start_time, units = "secs")),3)
@@ -172,14 +198,14 @@ foreach(j = 1:length(dataset),.packages = packages) %dopar% # comentar para corr
           
             # guardar model
             #save(model, file = paste("./models-rf/",file.name,".RData",sep=""),compress = TRUE)
-            pred <- predict(model, test.set)
+            pred <- predict(model, test)
             
             # guardar csv con valor real vs predicho
-            dataset <- as.data.frame(cbind(test.set[pred_sensores[p]],pred))
+            dataset <- as.data.frame(cbind(test[pred_sensores[p]],pred))
             colnames(dataset)<- c("y_real","y_pred")
             write.csv(x = dataset,file = paste("./results-rf/",file.name,"--Y-vs-Y_pred.csv",sep = ""))
             #evaluar resultados en testeo
-            eee <- evaluate(pred,test.set[,pred_sensores[p]])
+            eee <- evaluate(pred,test[,pred_sensores[p]])
             #guardo detalles del experimento
             row <- paste(fila,timerf,nfrostorig,nrow(training.set),nfrost,
                          eee$rmse,eee$r2,eee$sens,eee$acc,eee$prec,eee$spec,sep=",")
