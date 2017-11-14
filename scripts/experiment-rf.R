@@ -25,7 +25,7 @@ dataset <- c("dacc","dacc-temp","dacc-spring")
 config.train <-c("normal","smote")
 #' T cuantos dias anteriores tomamos
 period <- c(1,2,3,4,5)
-tunegrid <- expand.grid(.mtry=c(10:25),.ntree=seq(from=500,to=3500,by=500))
+tunegrid <- expand.grid(.mtry=c(10:25),.ntree=seq(from=500,to=2500,by=500))
 # porcentaje para train set split
 porc_train = 0.68
 #' m = model or predicted values
@@ -51,7 +51,6 @@ evaluate <- function(pred, obs) #tested
   return(list(rmse = rmse, r2 = r2, sens= sens, spec= spec, prec= p, acc= acc))
 }
 
-#TODO testear
 # var: nombre variable a predecir,ejemplo *_tmin
 # variables: colnames o conjunto de variables del dataset
 vars.del.sensor <- function(var,variables,dataset_tmin_chaar=FALSE)
@@ -71,19 +70,18 @@ Log <- function(text, ...) {
   #write.socket(log.socket, msg)
 }
 
-#cl <- makeCluster(4,outfile=paste("output-rf-",Sys.time(),".log",sep="")) # colocar detectCores() en server  en vez de 4
-#registerDoParallel(cl)
+cl <- makeCluster(4,outfile=paste("output-rf-",Sys.time(),".log",sep="")) # colocar detectCores() en server  en vez de 4
+registerDoParallel(cl)
 
 
 RESUMEN <<- paste(Sys.time(),"--rf--experimento.csv",sep="")
 columnas <- paste("dataset","days","ncol","nrow","config_train","alg","ntree","mtry","var",
                   "t_run_s","nfrostorig","ntrain","nfrostsmote",
                   "RMSE","r2","Sensitivity","Acc","Precision","Specificity",sep = ",")
-#"ntrain", "ntest",
 write(columnas,file=RESUMEN)
 
-#foreach(j = 1:length(dataset),.packages = packages) %dopar% # comentar para correr en modo debug o rstudio y descomentar linea de abajo
-for(j in 1:length(dataset)) # POR cada uno de los datasets
+foreach(j = 1:length(dataset),.packages = packages) %dopar% # comentar para correr en modo debug o rstudio y descomentar linea de abajo
+#for(j in 1:length(dataset)) # POR cada uno de los datasets
 {
  # traigo dataset 
   dd <-get.dataset(dataset[j])
@@ -91,8 +89,8 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
   pred_sensores_base <- dd$pred
   Log("DATASET ",dd$name)
   
-  #foreach(t = 1:length(period),.packages = packages) %dopar% 
-  for(t in 1:length(period))
+  foreach(t = 1:length(period),.packages = packages) %dopar% 
+  #for(t in 1:length(period))
   {
     Log("Period ",t)
     #row <- cbind.data.frame(row,t)
@@ -110,20 +108,20 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
     test.set = df[until:nrow(df), ]
     nfrost <- NA
     
-    #foreach(p = 1:length(pred_sensores),.packages = packages) %dopar% # arranca en 2 para evitar procesar junin
-    for(p in 1:length(pred_sensores)) #junin ya lo he realizado
+    foreach(p = 1:length(pred_sensores),.packages = packages) %dopar% # arranca en 2 para evitar procesar junin
+   # for(p in 1:length(pred_sensores)) #junin ya lo he realizado
     {
       Log(pred_sensores[p])
       nfrostorig <- length(training.set[training.set[,pred_sensores[p]] <= 0,pred_sensores[p]])
       
     #foreach(u = 1:nrow(tunegrid),.packages = packages) %dopar% 
-    #foreach(u = 1:length(unique(tunegrid$.ntree)),.packages = packages) %dopar%  # config LOCAL
-    for(u in 1:length(unique(tunegrid$.ntree)))  # CONFIG LOCAL
+    foreach(u = 1:length(unique(tunegrid$.ntree)),.packages = packages) %dopar%  # config LOCAL
+    #for(u in 1:length(unique(tunegrid$.ntree)))  # CONFIG LOCAL
        # for(u in 1:nrow(tunegrid))
       {
         
-        #foreach(c = 1:length(config.train),.packages = packages) %dopar%  # solo corro SMOTE, volver 2 como 1 para rollback
-        for(c in 1:length(config.train))
+        foreach(c = 1:length(config.train),.packages = packages) %dopar%  # solo corro SMOTE, volver 2 como 1 para rollback
+    #    for(c in 1:length(config.train))
         {
           ts <- training.set
           test <- test.set
