@@ -30,8 +30,8 @@ dataset <- c("dacc","dacc-temp","dacc-spring")
 config.train <-c("normal","smote")
 
 # local: configuracion para armar red bayesiana con sólo las variables locales, de la propia estación
-#alg <- c("local") 
-alg <- c("hc","tabu","local") 
+alg <- c("local") 
+#alg <- c("hc","tabu","local") 
 
 #' T cuantos dias anteriores tomamos
 period <- c(1,2,3,4,5)
@@ -47,6 +47,11 @@ score <- c("bic-g","loglik-g","aic-g","bge")
 #' 
 RMSE = function(m, o){  sqrt(mean((m - o)^2)) } #tested
 rsq <- function(x, y){ summary(lm(y~x))$r.squared } #tested
+
+Log <- function(text, ...) {
+  msg <- sprintf(paste0(as.character(Sys.time()), ": ", text, "\n"), ...)
+  cat(msg)
+}
 
 
 #' pred & obs are vectors or arrays with the same length
@@ -258,8 +263,9 @@ learn.bayes <- function(df, wl=NULL,bl=NULL,alg="hc",sc="bic",var=NULL)
   
 }
 
-cl <- makeCluster(4) # colocar 12 en server
-registerDoParallel(cl)  
+
+cl <- makeCluster(4,outfile=paste("output-bn-",as.chaar(Sys.time()),".log",sep="")) # colocar detectCores() en server  en vez de 4
+registerDoParallel(cl)
 
 #library(doMC)
 #registerDoMC(4)
@@ -271,19 +277,19 @@ columnas <- paste("dataset","days","ncol","nrow","config_train","alg","score",
 #"ntrain", "ntest",
 write(columnas,file=RESUMEN)
 
-foreach(j = 1:3,.packages = packages) %dopar% # volver 2 como 1 para correr dataset dacc
-#for(j in 1:length(dataset)) # POR cada uno de los datasets
+#foreach(j = 1:3,.packages = packages) %dopar% # volver 2 como 1 para correr dataset dacc
+for(j in 1:length(dataset)) # POR cada uno de los datasets
 {
  # traigo dataset 
   dd <-get.dataset(dataset[j])
   sensores <- dd$data[-1] #quito columna date o primer columna
   pred_sensores_base <- dd$pred
-  cat("DATASET ",dd$name,"\n")
+  Log(paste("DATASET ",dd$name,sep = ""))
   
-  foreach(t = 1:length(period),.packages = packages) %dopar% 
-  #for(t in 1:length(period))
+#  foreach(t = 1:length(period),.packages = packages) %dopar% 
+  for(t in 1:length(period))
   {
-    cat("Period ",t)
+    Log(paste("Period ",t))
     #row <- cbind.data.frame(row,t)
     #file.name <- paste(file.name,t,sep = "--")
     #' Obtengo dataset con variables desfasadas a t dias 
@@ -298,15 +304,15 @@ foreach(j = 1:3,.packages = packages) %dopar% # volver 2 como 1 para correr data
     bl <<- get_blacklist(pred_sensores)
     wl <<- get_whitelist(pred_sensores,colnames(df))
     print(wl)
-    foreach(a = 1:length(alg),.packages = packages) %dopar% 
-    #for(a in 1:length(alg))
+    #foreach(a = 1:length(alg),.packages = packages) %dopar% 
+    for(a in 1:length(alg))
     {
-      cat("Alg ",alg[a])
+      Log("Alg ",alg[a])
       
         #foreach(s = 1:length(score),.packages = packages) %dopar%   
         for(s in 1:length(score))
          {
-           cat("Score ",score[s])
+           Log("Score ",score[s])
           #foreach(c = 2:length(config.train),.packages = packages) %dopar%  # solo corro SMOTE, volver 2 como 1 para rollback
           for(c in 1:length(config.train))
           {
@@ -350,38 +356,3 @@ foreach(j = 1:3,.packages = packages) %dopar% # volver 2 como 1 para correr data
 }# for por dataset
 
 stopCluster(cl)
-
-# no correr!! es solo codigo copypaste
-testeo.results <- function()
-{
-  
-  #TODO 
-  #levantar archivos con Y_Ypred
-  # calcular resultados por cada archivo
-  
-  
-  #' Predicciones, evaluación en conjunto de testeo
-  #'
-  
-  df_res <- errors_regression(pred_sensores, fitted, test.set, verbose = FALSE)
-  
-  print(df_res)
-  
-  #' llamar confusionMatrix de caret, pasar primero "a factor of predicted classes, then a factor
-  #'  of classes to be used as the true results
-  
-  breaks.binario <- c(-10,0,50) # caso Helada y no helada
-  my.breaks <- c(-10,-5,0,2,5,10,50)
-  
-  #' ### Caso binario: helada o no helada
-  #'
-  
-  conf_matrix_binario = conf_matrix(fitted,pred_sensores,test.set, breaks.binario)
-  
-  
-  #' ### Evaluación de predicción en rangos de temperaturas
-  #'
-  
-  conf_matrix_temp = conf_matrix(fitted,pred_sensores,test.set, my.breaks)
-  
-}
