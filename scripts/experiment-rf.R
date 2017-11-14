@@ -21,10 +21,10 @@ LOCAL <- TRUE
 SAVE_DATASET <- FALSE
 #
 split.train <- 0.68 # porcentaje de datos en el dataset de entremaniento
-dataset <- c("dacc","dacc-temp","dacc-spring") 
+dataset <- c("dacc")#,"dacc-temp","dacc-spring") 
 config.train <-c("normal","smote")
 #' T cuantos dias anteriores tomamos
-period <- c(1,2,3,4,5)
+period <- c(1)#,2,3,4,5)
 tunegrid <- expand.grid(.mtry=c(10:25),.ntree=seq(from=500,to=2500,by=500))
 # porcentaje para train set split
 porc_train = 0.68
@@ -63,15 +63,15 @@ vars.del.sensor <- function(var,variables,dataset_tmin_chaar=FALSE)
   #vars <- vars[-length(vars)] # quito la última variable min_t
   return(vars)
 }
-#log.socket <- make.socket(port=4000)
+
 Log <- function(text, ...) {
   msg <- sprintf(paste0(as.character(Sys.time()), ": ", text, "\n"), ...)
   cat(msg)
   #write.socket(log.socket, msg)
 }
 
-cl <- makeCluster(4,outfile=paste("output-rf-",Sys.time(),".log",sep="")) # colocar detectCores() en server  en vez de 4
-registerDoParallel(cl)
+#cl <- makeCluster(4,outfile=paste("output-rf-",Sys.time(),".log",sep="")) # colocar detectCores() en server  en vez de 4
+#registerDoParallel(cl)
 
 
 RESUMEN <<- paste(Sys.time(),"--rf--experimento.csv",sep="")
@@ -90,7 +90,7 @@ foreach(j = 1:length(dataset),.packages = packages) %dopar% # comentar para corr
   Log("DATASET ",dd$name)
   
   foreach(t = 1:length(period),.packages = packages) %dopar% 
-  #for(t in 1:length(period))
+ # for(t in 1:length(period))
   {
     Log("Period ",t)
     #row <- cbind.data.frame(row,t)
@@ -109,7 +109,7 @@ foreach(j = 1:length(dataset),.packages = packages) %dopar% # comentar para corr
     nfrost <- NA
     
     foreach(p = 1:length(pred_sensores),.packages = packages) %dopar% # arranca en 2 para evitar procesar junin
-   # for(p in 1:length(pred_sensores)) #junin ya lo he realizado
+  #  for(p in 1:length(pred_sensores)) #junin ya lo he realizado
     {
       Log(pred_sensores[p])
       nfrostorig <- length(training.set[training.set[,pred_sensores[p]] <= 0,pred_sensores[p]])
@@ -119,8 +119,8 @@ foreach(j = 1:length(dataset),.packages = packages) %dopar% # comentar para corr
     #for(u in 1:length(unique(tunegrid$.ntree)))  # CONFIG LOCAL
        # for(u in 1:nrow(tunegrid))
       {
-        
-        foreach(c = 1:length(config.train),.packages = packages) %dopar%  # solo corro SMOTE, volver 2 como 1 para rollback
+        Log(paste("TuneGrid value u:",u," value ",unique(tunegrid$.ntree)[u],sep=""))
+       foreach(c = 1:length(config.train),.packages = packages) %dopar%  # 
     #    for(c in 1:length(config.train))
         {
           ts <- training.set
@@ -146,10 +146,11 @@ foreach(j = 1:length(dataset),.packages = packages) %dopar% # comentar para corr
             ts <- training.set[,vars]
             test <- test.set[,vars]
             fila <- paste(dd$name,t,ncol(df),nrow(df),config.train[c],"rf-local",
-                          tunegrid[u,]$.ntree,tunegrid[u,]$.mtry,pred_sensores[p],sep=",")
+                          unique(tunegrid$.ntree)[u],1,pred_sensores[p],sep=",")
             file.name <- paste(dd$name,t,config.train[c],"rf-local",unique(tunegrid$.ntree)[u],1,pred_sensores[p],sep = "--")
             
-            Log(paste("starts random Forest learning ntree:",tunegrid[u,]$.ntree))
+            Log(paste("starts random Forest learning ntree:",unique(tunegrid$.ntree)[u]))
+            
           }else{
             
             ts <- training.set
