@@ -15,11 +15,11 @@ set.seed(147)
 
 packages <- c("randomForest","caret","forecast","unbalanced","readr","xts","timeDate")
 # si quiero que solo tome las variables de la misma ubicacion y no las vecinas
-LOCAL <- FALSE
+LOCAL <- TRUE
 # si quiero guardar los dataset desfasados para ser usados por otras librerías.
 SAVE_DATASET <- FALSE
 # si quiero que los experimentos se ejecuten paralelamente en clusters o secuencialmente (porque estoy en debug o rstudio)
-PAR <- FALSE
+PAR <- TRUE
 #
 split.train <- 0.68 # porcentaje de datos en el dataset de entremaniento
 dataset <- c("dacc","dacc-temp","dacc-spring") 
