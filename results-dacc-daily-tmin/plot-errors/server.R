@@ -13,6 +13,11 @@ score <- c("bic-g","loglik-g","aic-g","bge")
 variables <- c("tunuyan.temp_min_t","las_paredes.temp_min_t","la_llave.temp_min_t","junin.temp_min_t","agua_amarga.temp_min_t")
 lista <- list.files(path=".",pattern="*.csv")
 
+
+RMSE = function(m, o){  sqrt(mean((m - o)^2)) } #tested
+rsq <- function(x, y){ summary(lm(y~x))$r.squared } #tested
+
+
 function(input, output, session){
   
   
@@ -55,7 +60,7 @@ function(input, output, session){
     
     if(is.null(input$variable)){return()}
     findthis <- paste(input$dataset,input$T,input$config,input$alg,input$score,input$variable,sep = "--")
-    archivo <- read_csv(lista[grep(findthis, lista,fixed=TRUE)])
+    archivo <- read.csv(lista[grep(findthis, lista,fixed=TRUE)],sep=",")
     #cumm <- cumm[-1] #quito la primer columna nombre x
     model$data <- sapply(archivo,as.numeric)
     return(archivo)
@@ -98,29 +103,35 @@ function(input, output, session){
   #
   output$errors <- renderDataTable({
     
+    pred = model$data[,3]
+    obs = model$data[,2]
+    
     if(is.null(model) || is.null(model$data)){return()}
-    aux <- accuracy(f = model$data[,3], x = model$data[,2])
-    aux <- round(aux,2)
-    aux
+    #aux <- accuracy(f = pred, x = obs)
+    
+    rmse <- round(RMSE(pred,obs),2)
+    r2 <- round(rsq(obs,pred),2)
+    d <- cbind.data.frame(rmse,r2)
+    d
     
   })
 
-  #Matriz de confusion caso de heladas
+  # #Matriz de confusion caso de heladas
   output$confMatFrost <- renderPrint({
-    
-    
+
+
     if(is.null(model) || is.null(model$data)){return(0)}
     breaks <- c(-20,0,50) # caso Helada y no helada
     y <- cut(model$data[,2], breaks = breaks)
     y_pred <- cut(model$data[,3], breaks = breaks)
     confusionMatrix(y_pred,y,mode="everything")
-    
+
   })
-  
+
   #Matriz de confusion analizando rango de temperaturas
   output$confMatTemps <- renderPrint({
-   
-    
+
+
     if(is.null(model) || is.null(model$data)){return(0)}
      breaks <- c(-20,-5,0,2,5,10,50) # caso Helada y no helada
     y <- cut(model$data[,2], breaks = breaks)
@@ -141,7 +152,8 @@ function(input, output, session){
     
     y <- cut(diff, breaks = breaks)
     
-    histogram(y)
+    plot(y,type="h")
+    
   })
   
   ## probar lo de abajo
@@ -169,8 +181,6 @@ function(input, output, session){
       rows <- c(rows, j)
       j <- j+0.5; i <- i+1
     }
-    print(error)
-    
     d <- as.data.frame(cbind(rows,error[,2]))
     colnames(d) <- c("intervals","error")
     

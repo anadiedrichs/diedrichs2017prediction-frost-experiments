@@ -25,13 +25,11 @@ shinyUI(fluidPage(
     
     mainPanel(
       tabsetPanel(
-        tabPanel("ConfusionMatrixHelada",verbatimTextOutput("confMatFrost")),
-        tabPanel("ConfusionMatrixTemps",verbatimTextOutput("confMatTemps")),
-        
+         tabPanel("ConfusionMatrixHelada",verbatimTextOutput("confMatFrost")),
+         tabPanel("ConfusionMatrixTemps",verbatimTextOutput("confMatTemps")),
         tabPanel("Errors regression", dataTableOutput("errors")),
-        
         tabPanel("Plot", plotlyOutput("plot")), 
-        # tabPanel("Summary", verbatimTextOutput("summary")), 
+        # tabPanel("Summary", verbatimTextOutput("summary")),
         tabPanel("Table", dataTableOutput("tbl")),
         tabPanel("Error distribution",plotOutput("cummulative")),
         tabPanel("Cummulative differences",dataTableOutput("cumm"))
