@@ -15,7 +15,7 @@ set.seed(147)
 
 packages <- c("randomForest","caret","forecast","unbalanced","readr","xts","timeDate")
 # si quiero que solo tome las variables de la misma ubicacion y no las vecinas
-LOCAL <- TRUE
+LOCAL <- FALSE
 # si quiero guardar los dataset desfasados para ser usados por otras librerías.
 SAVE_DATASET <- FALSE
 # si quiero que los experimentos se ejecuten paralelamente en clusters o secuencialmente (porque estoy en debug o rstudio)
@@ -158,7 +158,7 @@ experiment.config <- function(training.set,test.set,pred_sensor,fila_header,name
 
 #WARNING!! OJO! time and resource consuming! run only in dedicated server
 if(PAR==TRUE){
-  cl <- makeCluster(detectCores(),outfile=paste("output-rf-",Sys.time(),".log",sep="")) # colocar detectCores() en server  en vez de 4
+  cl <- makeCluster(detectCores(),outfile=paste("output-rf-junin-",Sys.time(),".log",sep="")) # colocar detectCores() en server  en vez de 4
   registerDoParallel(cl)
 }
 
@@ -196,16 +196,15 @@ foreach(j = 1:length(dataset),.packages = packages) %dopar% # comentar para corr
     test.set = df[until:nrow(df), ]
     nfrost <- NA
     
-    foreach(p = 1:length(pred_sensores),.packages = packages) %dopar% # arranca en 2 para evitar procesar junin
+    foreach(p = 1:1,.packages = packages) %dopar% # arranca en 2 para evitar procesar junin
   #  for(p in 1:length(pred_sensores)) #junin ya lo he realizado
     {
       Log(pred_sensores[p])
       
       if(LOCAL==TRUE){
         
-        #foreach(u = 1:length(unique(tunegrid$.ntree)),.packages = packages) %dopar%  # config LOCAL
-        for(u in 1:length(unique(tunegrid$.ntree)))  # CONFIG LOCAL
-          # for(u in 1:nrow(tunegrid))
+        foreach(u = 1:length(unique(tunegrid$.ntree)),.packages = packages) %dopar%  # config LOCAL
+        #for(u in 1:length(unique(tunegrid$.ntree)))  # CONFIG LOCAL
         {
           Log(paste("TuneGrid value u:",u," value ",unique(tunegrid$.ntree)[u],sep=""))
           experiment.config(training.set,test.set,pred_sensores[p],paste(dd$name,t,ncol(df),nrow(df),sep = ",")
@@ -214,11 +213,11 @@ foreach(j = 1:length(dataset),.packages = packages) %dopar% # comentar para corr
         
       }else{
         
-        #foreach(u = 1:nrow(tunegrid),.packages = packages) %dopar% 
-        for(u in 1:nrow(tunegrid))
+        foreach(u = 1:nrow(tunegrid),.packages = packages) %dopar% 
+        #for(u in 1:nrow(tunegrid))
         {
           experiment.config(training.set,test.set,pred_sensores[p],paste(dd$name,t,ncol(df),nrow(df),sep = ",")
-                            ,name_header = paste(dd$name,t,sep="--"),ntree= unique(tunegrid$.ntree)[u],mtry=tunegrid[u,]$.mtry)
+                            ,name_header = paste(dd$name,t,sep="--"),ntree= tunegrid[u,]$.ntree,mtry=tunegrid[u,]$.mtry)
         }# por tunegrid parameters
         
       }
