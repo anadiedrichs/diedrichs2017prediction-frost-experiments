@@ -61,7 +61,7 @@ vars.del.sensor <- function(var,variables,dataset_tmin_chaar=FALSE)
   if(dataset_tmin_chaar==TRUE) sensor <- paste(sensor,".",sep="") # esto es lo diferente, por bug #
   
   vars <- v[grepl( sensor, v, fixed = TRUE)] # extraigo todas las variables relacionadas con sensor
-  #vars <- vars[-length(vars)] # quito la última variable min_t
+  vars <- vars[-length(vars)] # quito la última variable min_t
   return(vars)
 }
 
@@ -75,7 +75,7 @@ experiment.config <- function(training.set,test.set,pred_sensor,fila_header,name
 {
   nfrostorig <- length(training.set[training.set[,pred_sensor] <= 0,pred_sensor])   #number of frost days in training set
   
-  foreach(c = 1:length(config.train),.packages = packages) %dopar%  # 
+  #foreach(c = 1:length(config.train),.packages = packages) %dopar%  # 
    for(c in 1:length(config.train))
   {
     ts <- training.set
@@ -93,17 +93,20 @@ experiment.config <- function(training.set,test.set,pred_sensor,fila_header,name
       ts <- data_smote$X
       nfrost <- length(data_smote$X[data_smote$X[,pred_sensor] <= 0,pred_sensor])
     }
+    
+    y.ts <- ts[,pred_sensor]
     # config rf-local o rf-solo
     if(LOCAL==TRUE)
     {
-      vars <- vars.del.sensor(pred_sensor,colnames(training.set))
-      ts <- training.set[,vars]
+      vars <- vars.del.sensor(pred_sensor,colnames(ts))
+      ts <- ts[,vars]
       test <- test.set[,vars]
       fila <- paste(fila_header,config.train[c],"rf-local",ntree,mtry,pred_sensor,sep=",")
       file.name <- paste(name_header,config.train[c],"rf-local",ntree,mtry,pred_sensor,sep = "--")
       
     }else{
-      ts <- training.set
+      # quitar variables en *_t, menos la del predictor
+      ts <- ts[,-which(colnames(ts) %in% pred_sensores)]
       fila <- paste(fila_header,config.train[c],"rf", ntree,mtry,pred_sensor,sep=",")
       file.name <- paste(name_header,config.train[c],"rf",ntree,mtry,pred_sensor,sep = "--")
     }
@@ -118,11 +121,11 @@ experiment.config <- function(training.set,test.set,pred_sensor,fila_header,name
       start_time <- Sys.time()
       if(LOCAL==TRUE)
       {
-        model <- randomForest(x =ts[,-which(colnames(ts) %in% pred_sensor)],y=ts[,pred_sensor], 
+        model <- randomForest(x =ts,y=y.ts, 
                               importance = TRUE, keep.forest=TRUE,proximity=FALSE,
                               ntree=ntree)
       }else{
-        model <- randomForest(x =ts[,-which(colnames(ts) %in% pred_sensor)],y=ts[,pred_sensor], 
+        model <- randomForest(x =ts,y=y.ts, 
                               importance = TRUE, keep.forest=TRUE,proximity=FALSE,
                               ntree=ntree, mtry=mtry)
       }
@@ -158,11 +161,11 @@ experiment.config <- function(training.set,test.set,pred_sensor,fila_header,name
 
 #WARNING!! OJO! time and resource consuming! run only in dedicated server
 if(PAR==TRUE){
-  cl <- makeCluster(detectCores(),outfile=paste("output-rf-junin-",Sys.time(),".log",sep="")) # colocar detectCores() en server  en vez de 4
+  cl <- makeCluster(detectCores(),outfile=paste("output-rf-todos-",Sys.time(),".log",sep="")) # colocar detectCores() en server  en vez de 4
   registerDoParallel(cl)
 }
 
-RESUMEN <<- paste(Sys.time(),"--rf--experimento.csv",sep="")
+RESUMEN <<- paste(Sys.time(),"--rf--TODOS--experimento.csv",sep="")
 columnas <- paste("dataset","days","ncol","nrow","config_train","alg","ntree","mtry","var",
                   "t_run_s","nfrostorig","ntrain","nfrostsmote",
                   "RMSE","r2","Sensitivity","Acc","Precision","Specificity",sep = ",")
@@ -186,7 +189,7 @@ foreach(j = 1:length(dataset),.packages = packages) %dopar% # comentar para corr
     #' Obtengo dataset con variables desfasadas a t dias 
     #'
     aux <- desfasar.dataset.T(t,sensores, pred_sensores_base)
-    pred_sensores <- aux$vars
+    pred_sensores <<- aux$vars # pred_sensores variable global
     df <- aux$data
     
     #' ### Training set y test dataset
@@ -196,7 +199,7 @@ foreach(j = 1:length(dataset),.packages = packages) %dopar% # comentar para corr
     test.set = df[until:nrow(df), ]
     nfrost <- NA
     
-    foreach(p = 1:1,.packages = packages) %dopar% # arranca en 2 para evitar procesar junin
+    foreach(p = 1:length(pred_sensores),.packages = packages) %dopar% # arranca en 2 para evitar procesar junin
   #  for(p in 1:length(pred_sensores)) #junin ya lo he realizado
     {
       Log(pred_sensores[p])
