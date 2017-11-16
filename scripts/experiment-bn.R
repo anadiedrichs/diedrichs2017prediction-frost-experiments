@@ -18,15 +18,16 @@ library(unbalanced)
 set.seed(147)
 
 packages <- c("bnlearn","caret","forecast","unbalanced","readr","xts","timeDate")
-# si quiero guardar los dataset desfasados para ser usados por otras librerías.
 
+PAR = FALSE
+# si quiero guardar los dataset desfasados para ser usados por otras librerías.
 SAVE_DATASET <- TRUE
 ownVariables <- FALSE
 split.train <- 0.68 # porcentaje de datos en el dataset de entremaniento
 
 ################
-
-dataset <- c("dacc","dacc-temp","dacc-spring") 
+# voy a correr solo dacc
+dataset <- c("dacc") #,"dacc-temp","dacc-spring") 
 config.train <-c("normal","smote")
 
 # local: configuracion para armar red bayesiana con sólo las variables locales, de la propia estación
@@ -34,7 +35,7 @@ alg <- c("local")
 #alg <- c("hc","tabu","local") 
 
 #' T cuantos dias anteriores tomamos
-period <- c(1,2,3,4,5)
+period <- c(2,3,4,5) #1,
 
 #' the multivariate Gaussian log-likelihood (loglik-g) score.
 #' the corresponding Akaike Information Criterion score (aic-g).
@@ -52,7 +53,6 @@ Log <- function(text, ...) {
   msg <- sprintf(paste0(as.character(Sys.time()), ": ", text, "\n"), ...)
   cat(msg)
 }
-
 
 #' pred & obs are vectors or arrays with the same length
 evaluate <- function(pred, obs) #tested
@@ -263,22 +263,20 @@ learn.bayes <- function(df, wl=NULL,bl=NULL,alg="hc",sc="bic",var=NULL)
   
 }
 
+if(PAR==TRUE){
+  cl <- makeCluster(detectCores(),outfile=paste("output-bn-dacc-",as.chaar(Sys.time()),".log",sep="")) # colocar detectCores() en server  en vez de 4
+  registerDoParallel(cl)
+}
 
-cl <- makeCluster(4,outfile=paste("output-bn-",as.chaar(Sys.time()),".log",sep="")) # colocar detectCores() en server  en vez de 4
-registerDoParallel(cl)
-
-#library(doMC)
-#registerDoMC(4)
-
-RESUMEN <<- paste(Sys.time(),"--experimento.csv",sep="")
+RESUMEN <<- paste(Sys.time(),"--experimento-bn-dacc.csv",sep="")
 columnas <- paste("dataset","days","ncol","nrow","config_train","alg","score",
                   "t_run_s"," t_fitted","nfrostorig","ntrain","nfrostsmote","var",
                   "RMSE","r2","Sensitivity","Acc","Precision","Specificity",sep = ",")
 #"ntrain", "ntest",
 write(columnas,file=RESUMEN)
 
-#foreach(j = 1:3,.packages = packages) %dopar% # volver 2 como 1 para correr dataset dacc
-for(j in 1:length(dataset)) # POR cada uno de los datasets
+foreach(j = 1:length(dataset),.packages = packages) %dopar% # volver 2 como 1 para correr dataset dacc
+#for(j in 1:length(dataset)) # POR cada uno de los datasets
 {
  # traigo dataset 
   dd <-get.dataset(dataset[j])
@@ -286,8 +284,8 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
   pred_sensores_base <- dd$pred
   Log(paste("DATASET ",dd$name,sep = ""))
   
-#  foreach(t = 1:length(period),.packages = packages) %dopar% 
-  for(t in 1:length(period))
+  foreach(t = 1:length(period),.packages = packages) %dopar% 
+#  for(t in 1:length(period))
   {
     Log(paste("Period ",t))
     #row <- cbind.data.frame(row,t)
@@ -304,17 +302,17 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
     bl <<- get_blacklist(pred_sensores)
     wl <<- get_whitelist(pred_sensores,colnames(df))
     print(wl)
-    #foreach(a = 1:length(alg),.packages = packages) %dopar% 
-    for(a in 1:length(alg))
+    foreach(a = 1:length(alg),.packages = packages) %dopar% 
+    #for(a in 1:length(alg))
     {
       Log("Alg ",alg[a])
       
-        #foreach(s = 1:length(score),.packages = packages) %dopar%   
-        for(s in 1:length(score))
+        foreach(s = 1:length(score),.packages = packages) %dopar%   
+        #for(s in 1:length(score))
          {
            Log("Score ",score[s])
-          #foreach(c = 2:length(config.train),.packages = packages) %dopar%  # solo corro SMOTE, volver 2 como 1 para rollback
-          for(c in 1:length(config.train))
+          foreach(c = 1:length(config.train),.packages = packages) %dopar%  # 
+         # for(c in 1:length(config.train))
           {
             u <- NULL
             #' ### Training set y test dataset
@@ -326,7 +324,7 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
             {
               if(alg[a]=="local")
               {
-                for(p in 1:length(pred_sensores))
+                foreach(p = 1:length(pred_sensores),.packages = packages) %dopar% 
                 {
                   fila <- paste(dd$name,t,ncol(df),nrow(df),config.train[c],alg[a],score[s],sep=",")
                   trainingNormalOneVar(df, alg=alg[a],sc=score[s], file.name = file.name, var = pred_sensores[p] , fila)
@@ -340,14 +338,13 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
             }else if(config.train[c]=="smote")
             {
               fila <- paste(dd$name,t,ncol(df),nrow(df),config.train[c],alg[a],score[s],sep=",")
-              for(p in 1:length(pred_sensores))
+              foreach(p = 1:length(pred_sensores),.packages = packages) %dopar% 
               {
                 trainingSMOTE(df, alg=alg[a],sc=score[s], file.name = file.name, var = pred_sensores[p], fila )
               }
             }
           }# por training config 
           #TODO break this for if alg == local
-          
           if(alg[a]=="local") break # salir de este for, solo dejamos que se ejecute una vez
           
         }# for por score 
@@ -355,4 +352,6 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
   }#for por T
 }# for por dataset
 
-stopCluster(cl)
+if(PAR==TRUE){
+  stopCluster(cl)
+}
