@@ -15,11 +15,11 @@ set.seed(147)
 
 packages <- c("randomForest","caret","forecast","unbalanced","readr","xts","timeDate")
 # si quiero que solo tome las variables de la misma ubicacion y no las vecinas
-LOCAL <- FALSE
+LOCAL <- TRUE
 # si quiero guardar los dataset desfasados para ser usados por otras librerías.
 SAVE_DATASET <- FALSE
 # si quiero que los experimentos se ejecuten paralelamente en clusters o secuencialmente (porque estoy en debug o rstudio)
-PAR <- TRUE
+PAR <- FALSE
 #
 split.train <- 0.68 # porcentaje de datos en el dataset de entremaniento
 dataset <- c("dacc","dacc-temp","dacc-spring") 
@@ -100,7 +100,6 @@ experiment.config <- function(training.set,test.set,pred_sensor,fila_header,name
     {
       vars <- vars.del.sensor(pred_sensor,colnames(ts))
       ts <- ts[,vars]
-      test <- test.set[,vars]
       fila <- paste(fila_header,config.train[c],"rf-local",ntree,mtry,pred_sensor,sep=",")
       file.name <- paste(name_header,config.train[c],"rf-local",ntree,mtry,pred_sensor,sep = "--")
       
