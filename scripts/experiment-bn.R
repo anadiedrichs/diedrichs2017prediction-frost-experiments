@@ -39,7 +39,7 @@ period <- c(3)#,4,5 #1
 #' the corresponding Akaike Information Criterion score (aic-g).
 #' the corresponding Bayesian Information Criterion score (bic-g).
 #' a score equivalent Gaussian posterior density (bge).
-score <- c("bic-g")#,"loglik-g","aic-g","bge")
+score <- c("bic-g","loglik-g","aic-g","bge")
 
 #' m = model or predicted values
 #' o = observed or real values
@@ -127,7 +127,7 @@ trainingNormal <- function(df,alg,sc, file.name, pred_sensores, fila,p=0.68)
   fitted = bn.fit(rr$model, training.set)     # learning of parameters
   end_time <- Sys.time()
   fitted.time <- round(as.numeric(difftime(end_time, start_time, units = "secs")),3)
-  save("./models/",fitted, file = paste(file.name,"--fitted.RData",sep="")) #,Sys.time()
+  save(fitted, file = paste("./models/",file.name,"--fitted.RData",sep="")) #,Sys.time()
   #' guardo modelo para más análisis o corridas posteriores
   #'
   
@@ -264,8 +264,8 @@ learn.bayes <- function(df, wl=NULL,bl=NULL,alg="hc",sc="bic",var=NULL)
 #' Caso para manejar entrenamiento configuracion local
 config.train.local <- function(config,df,file.name,fila,pred_sensores)
 {
-    #foreach(p = 1:length(pred_sensores),.packages = packages) %dopar% 
-    for(p in 1:length(pred_sensores))
+    foreach(p = 1:length(pred_sensores),.packages = packages) %dopar% 
+    #for(p in 1:length(pred_sensores))
     {
       if(config=="normal"){
         
@@ -282,7 +282,7 @@ config.train.others <- function(){}
 
 
 if(PAR==TRUE){
-  cl <- makeCluster(detectCores(),outfile=paste("output-bn-dacc-spring",Sys.time(),".log",sep="")) # 
+  cl <- makeCluster(detectCores(),outfile=paste("output-bn-dacc-spring-",Sys.time(),".log",sep="")) # 
   registerDoParallel(cl)
 }
 
