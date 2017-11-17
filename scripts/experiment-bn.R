@@ -34,7 +34,7 @@ config.train <-c("normal","smote")
 alg <- c("hc","tabu","local") 
 
 #' T cuantos dias anteriores tomamos
-period <- c(1,2,3)#,4,5 #1
+period <- c(2,3)#,4,5 #1
 #' the multivariate Gaussian log-likelihood (loglik-g) score.
 #' the corresponding Akaike Information Criterion score (aic-g).
 #' the corresponding Bayesian Information Criterion score (bic-g).
