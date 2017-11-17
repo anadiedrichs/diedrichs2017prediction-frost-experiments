@@ -14,15 +14,15 @@ library(timeDate)
 #' 
 #' Dataset dacc-spring es el dataset dacc pero solo con datos de dias de agosto hasta noviembre inclusive de cada año
 
-dataset <- c("dacc","dacc-temp","dacc-spring")
+dataset.list <- c("dacc","dacc-temp","dacc-spring")
 
 #' Get a dataset by name
 
 get.dataset <- function(d)
 {
-  if(d==dataset[1]) return(dacc_v2())
-  else if(d==dataset[2]) return(dacc.temp_v2())
-  else if(d==dataset[3]) return(dacc.spring_v2())
+  if(d==dataset.list[1]) return(dacc_v2())
+  else if(d==dataset.list[2]) return(dacc.temp_v2())
+  else if(d==dataset.list[3]) return(dacc.spring_v2())
   else stop("ERROR get.dataset, you muss pass the correct argument value")
 }
 
