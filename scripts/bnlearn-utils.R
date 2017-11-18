@@ -1,28 +1,33 @@
-
 library(bnlearn)
-library(forecast)
-library(caret)
+library(caret) # para confusion matrix
+library(forecast) # para metodo accuracy
 
 
-#' Function
-#' 
-
-require(graph)
-require(igraph)
-bn2igraph <- function(g.bn){
-   g <- igraph.from.graphNEL(as.graphNEL(g.bn))
-}
-
-test.plot <- function(){
-  
-  load(file="~/phd-repos/tmin/bnlearn/scripts/results/dacc--1--smote--hc--aic-g--bn.RData")
+#' m = model or predicted values
+#' o = observed or real values
+RMSE = function(m, o){  sqrt(mean((m - o)^2)) } #tested
+rsq <- function(x, y){ summary(lm(y~x))$r.squared } #tested
+#' pred & obs are vectors or arrays with the same length
+evaluate <- function(pred, obs) #tested
+{
+  #"RMSE","r2","Sensitivity","Acc","Precision"
+  rmse <- round(RMSE(pred,obs),2)
+  r2 <- round(rsq(obs,pred),2)
+  breaks <- c(-20,0,50) # caso Helada y no helada
+  y <- cut(obs, breaks = breaks)
+  y_pred <- cut(pred, breaks = breaks)
+  sens <- round(sensitivity(y_pred,y),2)
+  spec <- round(specificity(y_pred, y),2)
+  p <- round(precision(y_pred,y),2)
+  c <- confusionMatrix(y_pred,y)
+  acc <- round(c$overall["Accuracy"],2)
+  return(list(rmse = rmse, r2 = r2, sens= sens, spec= spec, prec= p, acc= acc))
 }
 
 #' blacklist: las variables predictoras no pueden conectarse entre ellas
 #' Recibe un array (pred_sensores) con nombres de variables, es decir, cada elemento del array es un string.
 #' Regresa un dataframe con campos from y to.
 #' tested
-
 get_blacklist <- function(pred_sensores)
 {
   bl <- data.frame(from=character(),to=character(),stringsAsFactors=FALSE)
@@ -70,6 +75,235 @@ get_whitelist <- function(pred_sensores,variables,dataset_tmin_chaar = FALSE){
   #print(wl)
   return(wl)
 }
+
+#Logger function
+Log <- function(text, ...) {
+  msg <- sprintf(paste0(as.character(Sys.time()), ": ", text,..., "\n"))
+  cat(msg)
+}
+
+#' As trainingNormal. The difference: after fitting the predict function is apply only to one "var"
+trainingNormalOneVar <- function(df,alg,sc, file.name, var, fila,p=split.train)
+{
+  until <- round(nrow(df)*p)
+  training.set = df[1:until-1, ] # This is training set to learn the parameters
+  test.set = df[until:nrow(df), ]
+  
+  rr <- learn.bayes(training.set, wl,bl,alg=alg,sc=sc,var=var)
+  res = rr$model
+  save(res, file = paste(PATH.MODELS,file.name,"--bn.RData",sep="")) #,Sys.time()
+  
+  #' Aprendizaje de parametros
+  #'
+  variables <- c(as.character(unique(wl[which(wl$to== var),"from"])),var)
+  start_time <- Sys.time()
+  fitted = bn.fit(rr$model, training.set[variables])     # learning of parameters
+  end_time <- Sys.time()
+  fitted.time <- round(as.numeric(difftime(end_time, start_time, units = "secs")),3)
+  save(fitted, file = paste(PATH.MODELS,file.name,"--fitted.RData",sep="")) #,Sys.time()
+  #' guardo modelo para más análisis o corridas posteriores
+  
+  
+  # nombre variable a predecir
+  f <- paste(file.name,var,sep="--")
+  #row <- c(row,pred_sensores[p]) 
+  # prediccion
+  pred = predict(fitted, var, test.set[variables])
+  # guardar csv con valor real vs predicho
+  dataset <- as.data.frame(cbind(test.set[var],pred))
+  colnames(dataset)<- c("y_real","y_pred")
+  write.csv(x = dataset,file = paste(PATH.RESULTS,f,"--Y-vs-Y_pred.csv",sep = ""))
+  #evaluar resultados en testeo
+  eee <- evaluate(pred,test.set[,var])
+  #guardo detalles del experimento
+  row <- paste(fila,rr$time,fitted.time,NA,nrow(training.set),NA,var,
+               eee$rmse,eee$r2,eee$sens,eee$acc,eee$prec,eee$spec,sep=",")
+  write(row, file=RESUMEN, append = TRUE)
+  
+  
+  return()
+}
+
+#' df: dataset, columns are variable or features
+#' alg: values possible hc, tabu or local
+#' file.name: string, how the model, results, etc files will be named
+#' pred_sensores: an array with strings, names of the variables we are interested on predict
+#' fila: string, values separated by comma, header_row to save in file *--experiment--
+trainingNormal <- function(df,alg,sc, file.name, pred_sensores, fila,p=split.train)
+{
+  
+  until <- round(nrow(df)*p)
+  training.set = df[1:until-1, ] # This is training set to learn the parameters
+  test.set = df[until:nrow(df), ]
+  
+  rr <- learn.bayes(training.set, wl,bl,alg=alg,sc=sc)
+  res = rr$model
+  save(res, file = paste(PATH.MODELS,file.name,"--bn.RData",sep="")) #,Sys.time()
+  
+  #' Aprendizaje de parametros
+  #'
+  start_time <- Sys.time()
+  fitted = bn.fit(rr$model, training.set)     # learning of parameters
+  end_time <- Sys.time()
+  fitted.time <- round(as.numeric(difftime(end_time, start_time, units = "secs")),3)
+  save(fitted, file = paste(PATH.MODELS,file.name,"--fitted.RData",sep="")) #,Sys.time()
+  #' guardo modelo para más análisis o corridas posteriores
+  #'
+  
+  for(p in 1:length(pred_sensores))
+  {
+    # nombre variable a predecir
+    f <- paste(file.name,pred_sensores[p],sep="--")
+    #row <- c(row,pred_sensores[p]) 
+    # prediccion
+    pred = predict(fitted, pred_sensores[p], test.set)
+    # guardar csv con valor real vs predicho
+    dataset <- as.data.frame(cbind(test.set[pred_sensores[p]],pred))
+    colnames(dataset)<- c("y_real","y_pred")
+    write.csv(x = dataset,file = paste(PATH.RESULTS,f,"--Y-vs-Y_pred.csv",sep = ""))
+    #evaluar resultados en testeo
+    eee <- evaluate(pred,test.set[,pred_sensores[p]])
+    #guardo detalles del experimento
+    row <- paste(fila,rr$time,fitted.time,NA,nrow(training.set),NA,pred_sensores[p],
+                 eee$rmse,eee$r2,eee$sens,eee$acc,eee$prec,eee$spec,sep=",")
+    write(row, file=RESUMEN, append = TRUE)
+    
+  }
+  
+  return()
+}
+
+#' df: dataset, columns are variable or features
+#' alg: values possible hc, tabu or local
+#' file.name: string, how the model, results, etc files will be named
+#' pred_sensores: an array with strings, names of the variables we are interested on predict
+#' fila: string, values separated by comma, header_row to save in file *--experiment--
+#' 
+#' This method split train and test set from df dataset, then apply SMOTE over train set. 
+#' In order to use SMOTE, an y vector is created, which contains the label 1: frost event or 0; no event
+trainingSMOTE <- function(df,alg,sc, file.name, var, fila,p=split.train)
+{
+  until <- round(nrow(df)*p)
+  training.set = df[1:until-1, ] # This is training set to learn the parameters
+  test.set = df[until:nrow(df), ]
+  nfrostorig <- length(training.set[training.set[,var] <= 0,var])
+  
+  #' Me enfoco en el caso de una sola estación junin, por lo que analizaremos solo la predicción sobre la misma....
+  Y_class <- as.factor(with(df,ifelse(df[,var] <= 0,1,0)))
+  #summary(Y_class)
+  #summary(Y_class[until:length(Y_class)])
+  
+  #' datos para entrenar
+  data_smote <- ubBalance(training.set,Y_class[1:(until-1)],type = "ubSMOTE",percOver = 300, percUnder = 150)
+  
+  #guardar este dataset desfasado en T
+  if(SAVE_DATASET){  write.csv(data_smote$X,paste(paste(PATH.SAVE.DATASET,file.name,var,"smote-dataset.csv",sep="--"))) }
+  
+  #' para visualizar la distribución de las clases
+  #' 
+  summary(data_smote$Y)
+  training.set <- data_smote$X
+  nfrost <- length(data_smote$X[data_smote$X[,var] <= 0,var])
+  
+  
+  rr <- learn.bayes(training.set, wl,bl,alg=alg,sc=sc,var=var)
+  res = rr$model
+  save(res, file = paste(PATH.MODELS,file.name,"--bn.RData",sep="")) #,Sys.time()
+  
+  #' Aprendizaje de parametros
+  variables <- c(as.character(unique(wl[which(wl$to== var),"from"])),var)
+  
+  start_time <- Sys.time()
+  if(alg=="local"){fitted = bn.fit(rr$model, training.set[variables])}
+  else fitted = bn.fit(rr$model, training.set)
+  end_time <- Sys.time()
+  fitted.time <- round(as.numeric(end_time-start_time),3)
+  save(fitted, file = paste(PATH.MODELS,file.name,"--fitted.RData",sep="")) #,Sys.time()
+  
+  # nombre variable a predecir
+  f <- paste(file.name,var,sep="--")
+  #row <- c(row,pred_sensores[p]) 
+  # prediccion
+  pred = predict(fitted, var, test.set)
+  # guardar csv con valor real vs predicho
+  dataset <- as.data.frame(cbind(test.set[var],pred))
+  colnames(dataset)<- c("y_real","y_pred")
+  write.csv(x = dataset,file = paste("./results/",f,"--Y-vs-Y_pred.csv",sep = ""))
+  
+  
+  if(length(which(is.na(pred)==TRUE))<1){ #si la predicción regresó NA, el fitted no pudo ser calculado 
+    
+    #evaluar resultados en testeo
+    eee <- evaluate(pred,test.set[,var])
+    #guardo detalles del experimento
+    row <- paste(fila,rr$time,fitted.time,nfrostorig,nrow(training.set),nfrost,var,
+                 eee$rmse,eee$r2,eee$sens,eee$acc,eee$prec,eee$spec,sep=",")
+    
+  }else{
+    # CASO EN el que los parámetros no pueden ser calculados por pocos datos
+    # u otro error
+    #guardo detalles del experimento
+    row <- paste(fila,rr$time,fitted.time,nfrostorig,nrow(training.set),nfrost,var,
+                 NA,NA,NA,NA,NA,NA,sep=",")
+    
+  }
+  write(row, file=RESUMEN, append = TRUE)
+  
+  return()
+}
+
+#' Bayesian network structure learning
+#' 
+learn.bayes <- function(df, wl=NULL,bl=NULL,alg="hc",sc="bic",var=NULL)
+{
+  time = NULL; res = NULL
+  if(alg!="local" && !which(sc %in% score)) stop("score inexistente en learn.bayes")
+  
+  if(alg=="hc")
+  {
+    start_time <- Sys.time()
+    res = hc(df, whitelist=wl,blacklist = bl, score = sc)
+    end_time <- Sys.time()
+    time = round(as.numeric(difftime(end_time, start_time, units = "secs")),3)
+    
+  }else if(alg=="tabu"){
+    
+    start_time <- Sys.time()
+    res = tabu(df, whitelist=wl,blacklist = bl, score = sc)
+    end_time <- Sys.time()
+    time = round(as.numeric(difftime(end_time, start_time, units = "secs")),3)
+    
+  }else if(alg=="local")
+  {
+    if(is.null(var) || is.null(wl)) stop("var and wl must not be NULL in learn.bayes function")
+    # recuperar variables relacionadas con el sensor
+    variables <- c(as.character(unique(wl[which(wl$to== var),"from"])),var)
+    res = empty.graph(variables)
+    #class(e)
+    arcs(res) <- sapply(wl[which(wl$to== var),],as.character)
+    time = 0
+  }
+  
+  return(list(model=res, time = round(as.numeric(time),3)))
+  
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+######################################################################################3
+#' Los siguientes métodos no son usados en experiment-bn*, pero si son
+#' usados en los notebooks o *preProcess scripts examples
+
 #' Matriz de confusion calculada usando libreria caret
 #' fitted objeto clase bn.fit
 #' pred_sensores array nombre de variables de interes a predecir
@@ -96,6 +330,21 @@ conf_matrix <- function(fitted,pred_sensores,test.set, breaks, verbose = TRUE)
   # regresar la lista
   return(lista)
 }
+
+#' Function
+#' 
+
+require(graph)
+require(igraph)
+bn2igraph <- function(g.bn){
+  g <- igraph.from.graphNEL(as.graphNEL(g.bn))
+}
+
+test.plot <- function(){
+  
+  load(file="~/phd-repos/tmin/bnlearn/scripts/results/dacc--1--smote--hc--aic-g--bn.RData")
+}
+
 
 #'caso para breaks binario
 conf_matrix_df_frost <- function(fitted,pred_sensores,test.set, verbose = TRUE)

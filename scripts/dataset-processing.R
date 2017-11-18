@@ -4,6 +4,7 @@ library(xts)
 library(timeDate)
 
 #' Dataset dacc (año 2007 hasta 2014) son los datos sumarizados diarios de las estaciones:
+#' 
 #' * Junín
 #' * Tunuyán
 #' * Agua Amarga
@@ -13,17 +14,48 @@ library(timeDate)
 #' Dataset dacc-temp es el dataset dacc pero solo con información de temperaturas
 #' 
 #' Dataset dacc-spring es el dataset dacc pero solo con datos de dias de agosto hasta noviembre inclusive de cada año
+#' 
+#' Dataset inta-junin : 20 sensores de temperatura en parcela 20x20
+#' 
 
-dataset.list <- c("dacc","dacc-temp","dacc-spring")
+all.dataset.list <<- c("dacc","dacc-temp","dacc-spring","inta") # all available datasets
+dataset.list <<- NULL
+dataset <<- c("dacc")#,"dacc","dacc-temp") #,"dacc-spring") 
 
+get.list.of.datasets <- function(name){
+  
+  if(name=="dacc"){dataset.list <<- c("dacc","dacc-temp","dacc-spring")}
+  else if(name=="inta") {dataset.list <<- c("inta")}
+  else if(name=="ur") {dataset.list <<- NULL}
+  else stop("ERROR get.list.of.datasets, possible values are dacc, inta or ur")
+  
+  return(dataset.list)
+}
 #' Get a dataset by name
 
 get.dataset <- function(d)
 {
-  if(d==dataset.list[1]) return(dacc_v2())
-  else if(d==dataset.list[2]) return(dacc.temp_v2())
-  else if(d==dataset.list[3]) return(dacc.spring_v2())
+  if(d==all.dataset.list[1]) return(dacc_v2())
+  else if(d==all.dataset.list[2]) return(dacc.temp_v2())
+  else if(d==all.dataset.list[3]) return(dacc.spring_v2())
+  else if(d==all.dataset.list[4]) return(inta_data()) #TODO
   else stop("ERROR get.dataset, you muss pass the correct argument value")
+}
+
+inta_data <- function()
+{
+  sensores <- read_csv("~/phd-repos/tmin/bnlearn/data/sensores.csv")
+  #' Columnas a borrar "X1" 
+  #sensores <- sensores[-1]
+  #' dejar columnas de max, min y media
+  colmin <- colnames(sensores)[grepl("min",colnames(sensores),fixed=TRUE)]
+  colmax <- colnames(sensores)[grepl("max",colnames(sensores),fixed=TRUE)]
+  colavg <- c(colnames(sensores)[grepl("media",colnames(sensores),fixed=TRUE)],
+              colnames(sensores)[grepl("temp_med",colnames(sensores),fixed=TRUE)])
+  sensores <- sensores[c(colmin,colmax,colavg)]
+  #' como denomino a las variables que quiero predecir, temperaturas minimas
+  pred_sensores <- colmin[-21] # quito la minima de humedad de la estacion
+  return(list(data=sensores, pred= pred_sensores,name="inta"))
 }
 
 # probado
@@ -132,7 +164,7 @@ dacc.temp <- function()
   return(list(data = data, pred = d$pred, name="dacc-temp"))
 }
 
-
+#' slide window method
 # tested
 desfasar.dataset.T <- function(T_value,sensores, pred_sensores){
   
