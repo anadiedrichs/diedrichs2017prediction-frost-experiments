@@ -48,13 +48,15 @@ inta_data <- function()
   #' Columnas a borrar "X1" 
   #sensores <- sensores[-1]
   #' dejar columnas de max, min y media
+  sensores <- sensores[-which(grepl("Est",colnames(sensores),fixed=TRUE))] # quito columnas de la estacion
   colmin <- colnames(sensores)[grepl("min",colnames(sensores),fixed=TRUE)]
   colmax <- colnames(sensores)[grepl("max",colnames(sensores),fixed=TRUE)]
   colavg <- c(colnames(sensores)[grepl("media",colnames(sensores),fixed=TRUE)],
               colnames(sensores)[grepl("temp_med",colnames(sensores),fixed=TRUE)])
   sensores <- sensores[c(colmin,colmax,colavg)]
   #' como denomino a las variables que quiero predecir, temperaturas minimas
-  pred_sensores <- colmin[-21] # quito la minima de humedad de la estacion
+  #pred_sensores <- colmin[-21] # quito la minima de humedad de la estacion
+  pred_sensores <- colmin
   return(list(data=sensores, pred= pred_sensores,name="inta"))
 }
 

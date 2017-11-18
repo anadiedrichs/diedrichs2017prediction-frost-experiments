@@ -15,19 +15,19 @@ PATH.MODELS <- "./models-inta/"
 PATH.RESULTS <- "./results-inta/"
 PATH.SAVE.DATASET <- "./datasets-inta/"
 #' True for parallel cluster execution (run only on server, not desktop), false for sequential execution
-PAR = FALSE
+PAR = TRUE
 # si quiero guardar los dataset desfasados para ser usados por otras librerías.
 SAVE_DATASET <- TRUE
 
 packages <- c("bnlearn","caret","forecast","unbalanced","readr","xts","timeDate")
 split.train <<- 0.68 # porcentaje de datos en el dataset de entremaniento
-config.train <<-c("smote","normal")
+config.train <<-c("normal","smote")
 # local: configuracion para armar red bayesiana con sólo las variables locales, de la propia estación
 #alg <- c("local") 
-alg <<- c("hc","tabu","local") 
+alg <<- c("local","hc","tabu") 
 
 #' T how many previous day of information we take
-period <<- c(1,2,3)#,4,5 #1
+period <<- c(1)#,2,3)#,4,5 #1
 #' the multivariate Gaussian log-likelihood (loglik-g) score.
 #' the corresponding Akaike Information Criterion score (aic-g).
 #' the corresponding Bayesian Information Criterion score (bic-g).
@@ -38,8 +38,7 @@ source("bnlearn-utils.R")
 source("dataset-processing.R")
 
 ################
-# voy a correr solo dacc
-#dataset <<- c("dacc")#,"dacc","dacc-temp") #,"dacc-spring") 
+# dataset <<- c("dacc")#,"dacc","dacc-temp") #,"dacc-spring") 
 dataset <<- get.list.of.datasets(DATA)
 
 #' Caso para manejar entrenamiento configuracion local
@@ -76,8 +75,10 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
 {
  # traigo dataset 
   dd <-get.dataset(dataset[j])
+  ## issue #17
   if(DATA=="dacc"){ sensores <- dd$data[-1]} #quito columna date o primer columna
   else sensores <- dd$data
+  ## end issue 
   pred_sensores_base <- dd$pred
   Log(paste("DATASET ",dd$name,sep = ""))
   
