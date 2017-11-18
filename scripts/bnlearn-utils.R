@@ -188,7 +188,7 @@ trainingSMOTE <- function(df,alg,sc, file.name, var, fila,p=split.train)
   test.set = df[until:nrow(df), ]
   nfrostorig <- length(training.set[training.set[,var] <= 0,var])
   
-  #' Me enfoco en el caso de una sola estación junin, por lo que analizaremos solo la predicción sobre la misma....
+  #' Me enfoco en el caso de una sola estación 
   Y_class <- as.factor(with(df,ifelse(df[,var] <= 0,1,0)))
   #summary(Y_class)
   #summary(Y_class[until:length(Y_class)])
@@ -228,7 +228,7 @@ trainingSMOTE <- function(df,alg,sc, file.name, var, fila,p=split.train)
   # guardar csv con valor real vs predicho
   dataset <- as.data.frame(cbind(test.set[var],pred))
   colnames(dataset)<- c("y_real","y_pred")
-  write.csv(x = dataset,file = paste("./results/",f,"--Y-vs-Y_pred.csv",sep = ""))
+  write.csv(x = dataset,file = paste(PATH.RESULTS ,f,"--Y-vs-Y_pred.csv",sep = ""))
   
   
   if(length(which(is.na(pred)==TRUE))<1){ #si la predicción regresó NA, el fitted no pudo ser calculado 
