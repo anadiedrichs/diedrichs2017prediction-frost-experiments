@@ -288,18 +288,6 @@ learn.bayes <- function(df, wl=NULL,bl=NULL,alg="hc",sc="bic",var=NULL)
   
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
 ######################################################################################3
 #' Los siguientes métodos no son usados en experiment-bn*, pero si son
 #' usados en los notebooks o *preProcess scripts examples

@@ -15,7 +15,7 @@ library(timeDate)
 #' 
 #' Dataset dacc-spring es el dataset dacc pero solo con datos de dias de agosto hasta noviembre inclusive de cada año
 #' 
-#' Dataset inta-junin : 20 sensores de temperatura en parcela 20x20
+#' Dataset inta-junin : 20 sensores de temperatura en parcela 100x100 del Ing Agr Javier Chaar
 #' 
 
 all.dataset.list <<- c("dacc","dacc-temp","dacc-spring","inta") # all available datasets
