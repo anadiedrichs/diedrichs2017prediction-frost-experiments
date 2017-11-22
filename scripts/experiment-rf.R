@@ -1,56 +1,42 @@
-#'
-#' TODO actualizar este comment
-#' FORMATO NOMBRE DE ARCHIVO SALIDA
-#' <dataset>-<variable>-<T period en numero>-<S o N, S para SMOTE y N normal>-<H humedad incluida, N no incluida>-<algoritmo>-<score>
 
 library(randomForest)
-
-source("dataset-processing.R")
-
-library(caret) # para confusion matrix
-
 library(doParallel)
 library(unbalanced)
 set.seed(147)
 
+TMIN_CHAAR <-NULL
+DATA <- "inta" # possible values: dacc, inta, ur, needed for dataset-processing.R
+if(DATA=="inta"){TMIN_CHAAR <-TRUE}else{TMIN_CHAAR <-FALSE}
+OUTPUT.FILE <- "output-rf-inta-1-" # <- where prints go while cluster is running
+FILE.RESULT.NAME <- "--experimento-rf-inta-1.csv"
+#PATH.MODELS <- "./models-rf/"
+PATH.RESULTS <- "./results-rf/"
+PATH.SAVE.DATASET <- "./datasets-rf/"
+
 packages <- c("randomForest","caret","forecast","unbalanced","readr","xts","timeDate")
 # si quiero que solo tome las variables de la misma ubicacion y no las vecinas
-LOCAL <- TRUE
+LOCAL <- FALSE
 # si quiero guardar los dataset desfasados para ser usados por otras librerías.
 SAVE_DATASET <- FALSE
 # si quiero que los experimentos se ejecuten paralelamente en clusters o secuencialmente (porque estoy en debug o rstudio)
-PAR <- FALSE
+PAR <- TRUE
 #
 split.train <- 0.68 # porcentaje de datos en el dataset de entremaniento
 dataset <- c("dacc","dacc-temp","dacc-spring") 
 config.train <-c("normal","smote")
 #' T cuantos dias anteriores tomamos
-period <- c(1,2,3,4,5)
+period <- c(1)#,2,3,4,5)
 tunegrid <- expand.grid(.mtry=c(10:25),.ntree=seq(from=500,to=2500,by=500))
 # porcentaje para train set split
 porc_train = 0.68
-#' m = model or predicted values
-#' o = observed or real values
-#' 
-RMSE = function(m, o){  sqrt(mean((m - o)^2)) } #tested
-rsq <- function(x, y){ summary(lm(y~x))$r.squared } #tested
 
-#' pred & obs are vectors or arrays with the same length
-evaluate <- function(pred, obs) #tested
-{
-  #"RMSE","r2","Sensitivity","Acc","Precision"
-  rmse <- round(RMSE(pred,obs),2)
-  r2 <- round(rsq(obs,pred),2)
-  breaks <- c(-20,0,50) # caso Helada y no helada
-  y <- cut(obs, breaks = breaks)
-  y_pred <- cut(pred, breaks = breaks)
-  sens <- round(sensitivity(y_pred,y),2)
-  spec <- round(specificity(y_pred, y),2)
-  p <- round(precision(y_pred,y),2)
-  c <- confusionMatrix(y_pred,y)
-  acc <- round(c$overall["Accuracy"],2)
-  return(list(rmse = rmse, r2 = r2, sens= sens, spec= spec, prec= p, acc= acc))
-}
+
+source("bnlearn-utils.R")
+source("dataset-processing.R")
+
+################
+# dataset <<- c("dacc")#,"dacc","dacc-temp") #,"dacc-spring") 
+dataset <<- get.list.of.datasets(DATA)
 
 # var: nombre variable a predecir,ejemplo *_tmin
 # variables: colnames o conjunto de variables del dataset
@@ -63,12 +49,6 @@ vars.del.sensor <- function(var,variables,dataset_tmin_chaar=FALSE)
   vars <- v[grepl( sensor, v, fixed = TRUE)] # extraigo todas las variables relacionadas con sensor
   vars <- vars[-length(vars)] # quito la última variable min_t
   return(vars)
-}
-
-Log <- function(text, ...) {
-  msg <- sprintf(paste0(as.character(Sys.time()), ": ", text, "\n"), ...)
-  cat(msg)
-  #write.socket(log.socket, msg)
 }
 
 experiment.config <- function(training.set,test.set,pred_sensor,fila_header,name_header,mtry,ntree)
@@ -111,7 +91,7 @@ experiment.config <- function(training.set,test.set,pred_sensor,fila_header,name
     }
     
     #guardar este dataset desfasado en T de smote
-    if(SAVE_DATASET && config.train[c]=="smote"){  write.csv(data_smote$X,paste(paste(file.name,pred_sensores[p],"smote-dataset.csv",sep="--"))) }
+    if(SAVE_DATASET && config.train[c]=="smote"){  write.csv(data_smote$X,paste(paste(PATH.SAVE.DATASET,file.name,pred_sensores[p],"smote-dataset.csv",sep="--"))) }
     Log(fila)
     Log(paste("starts random Forest learning mtry:",mtry," ntree:",ntree))
     
@@ -131,8 +111,8 @@ experiment.config <- function(training.set,test.set,pred_sensor,fila_header,name
       
       end_time <- Sys.time()
       timerf <- round(as.numeric(difftime(end_time, start_time, units = "secs")),3)
-      write.csv(importance(model),file = paste("./results-rf/",file.name,"--importance.csv",sep = ""))
-      write.csv(data.frame(mse=model$mse,rsq=model$rsq),file = paste("./results-rf/",file.name,"--mse-rsq-vs-ntree.csv",sep = ""))
+      write.csv(importance(model),file = paste(PATH.RESULTS,file.name,"--importance.csv",sep = ""))
+      write.csv(data.frame(mse=model$mse,rsq=model$rsq),file = paste(PATH.RESULTS,file.name,"--mse-rsq-vs-ntree.csv",sep = ""))
       
       # guardar model
       #save(model, file = paste("./models-rf/",file.name,".RData",sep=""),compress = TRUE)
@@ -160,11 +140,11 @@ experiment.config <- function(training.set,test.set,pred_sensor,fila_header,name
 
 #WARNING!! OJO! time and resource consuming! run only in dedicated server
 if(PAR==TRUE){
-  cl <- makeCluster(detectCores(),outfile=paste("output-rf-todos-",Sys.time(),".log",sep="")) # colocar detectCores() en server  en vez de 4
+  cl <- makeCluster(detectCores(),outfile=paste(OUTPUT.FILE ,Sys.time(),".log",sep="")) # colocar detectCores() en server  en vez de 4
   registerDoParallel(cl)
 }
 
-RESUMEN <<- paste(Sys.time(),"--rf--TODOS--experimento.csv",sep="")
+RESUMEN <<- paste(Sys.time(),FILE.RESULT.NAME,sep="")
 columnas <- paste("dataset","days","ncol","nrow","config_train","alg","ntree","mtry","var",
                   "t_run_s","nfrostorig","ntrain","nfrostsmote",
                   "RMSE","r2","Sensitivity","Acc","Precision","Specificity",sep = ",")
@@ -175,18 +155,17 @@ foreach(j = 1:length(dataset),.packages = packages) %dopar% # comentar para corr
 {
  # traigo dataset 
   dd <-get.dataset(dataset[j])
-  sensores <- dd$data[-1] #quito columna date o primer columna
+  ## issue #17
+  if(DATA=="dacc"){ sensores <- dd$data[-1]} #quito columna date o primer columna
+  else sensores <- dd$data
+  ## end of issue #17
   pred_sensores_base <- dd$pred
   Log("DATASET ",dd$name)
   
   foreach(t = 1:length(period),.packages = packages) %dopar% 
- # for(t in 1:length(period))
+#  for(t in 1:length(period))
   {
     Log("Period ",t)
-    #row <- cbind.data.frame(row,t)
-    #file.name <- paste(file.name,t,sep = "--")
-    #' Obtengo dataset con variables desfasadas a t dias 
-    #'
     aux <- desfasar.dataset.T(t,sensores, pred_sensores_base)
     pred_sensores <<- aux$vars # pred_sensores variable global
     df <- aux$data
@@ -197,15 +176,17 @@ foreach(j = 1:length(dataset),.packages = packages) %dopar% # comentar para corr
     training.set = df[1:until-1, ] # This is training set to learn the parameters
     test.set = df[until:nrow(df), ]
     nfrost <- NA
-    
+
+#    foreach(p = 1:1,.packages = packages) %dopar% # arranca en 2 para evitar procesar junin
     foreach(p = 1:length(pred_sensores),.packages = packages) %dopar% # arranca en 2 para evitar procesar junin
-  #  for(p in 1:length(pred_sensores)) #junin ya lo he realizado
+#    for(p in 1:length(pred_sensores)) #junin ya lo he realizado
     {
       Log(pred_sensores[p])
       
       if(LOCAL==TRUE){
         
         foreach(u = 1:length(unique(tunegrid$.ntree)),.packages = packages) %dopar%  # config LOCAL
+        #  foreach(u = 1:1,.packages = packages) %dopar%  # config LOCAL
         #for(u in 1:length(unique(tunegrid$.ntree)))  # CONFIG LOCAL
         {
           Log(paste("TuneGrid value u:",u," value ",unique(tunegrid$.ntree)[u],sep=""))
@@ -215,6 +196,7 @@ foreach(j = 1:length(dataset),.packages = packages) %dopar% # comentar para corr
         
       }else{
         
+        #foreach(u = 1:1,.packages = packages) %dopar% 
         foreach(u = 1:nrow(tunegrid),.packages = packages) %dopar% 
         #for(u in 1:nrow(tunegrid))
         {
