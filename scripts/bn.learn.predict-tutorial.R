@@ -17,6 +17,23 @@ fitted = bn.fit(res, training.set)     # learning of parameters
 pred = predict(fitted, "C", test.set)  # predicts the value of node C given test set
 cbind(pred, test.set[, "C"])           # compare the actual and predicted
 accuracy(f = pred, x = test.set[, "C"])
+####
+
+res = inter.iamb(training.set,alpha = 0.01)
+fitted = bn.fit(res, training.set)     # learning of parameters
+pred = predict(fitted, "C", test.set)  # predicts the value of node C given test set
+cbind(pred, test.set[, "C"])           # compare the actual and predicted
+accuracy(f = pred, x = test.set[, "C"])
+
+
+data(learning.test)
+res = gs(learning.test)
+plot(res)
+fitted = bn.fit(res, learning.test) #da error porque es PDAG, hay que indicar direccion aristas
+# setting the direction of the undirected arcs
+bn = cextend(res)
+plot(bn)
+fitted = bn.fit(bn, learning.test) #da error porque es PDAG, hay que indicar direccion aristas
 
 #' caso dataset sensores.csv
 #' 
@@ -30,17 +47,23 @@ colnames(sensores_T) <- paste(colnames(sensores_T),"_T",sep="")
 # quito algunos sensores para simplicar el problema
 
 df <- cbind(sensores[1:(nrow(sensores)-1),-1],sensores_T[,-1])
-
-
 training.set = df[1:350, ] # This is training set to learn the parameters
 test.set = df[351:nrow(df), ]  # This is test set to give as evidence
+res = gs(training.set,alpha = 0.01)# da error
+fitted = bn.fit(res, training.set)     # learning of parameters
+pred = predict(fitted, "C", test.set)  # predicts the value of node C given test set
+cbind(pred, test.set[, "C"])           # compare the actual and predicted
+accuracy(f = pred, x = test.set[, "C"])
+
+
 
 #res2 = si.hiton.pc(training.set,alpha = 0.01) # <-- it takes a while running...
 # si uso lo anterior, da error al tratar de usar bn.fit, error:
 # Error in bn.fit(res, training.set) : the graph is only partially directed
+
+
 res3 <- inter.iamb(training.set, test = "smc-cor", B = 100, alpha = 0.01)
-dag = cpdag(res2)
-dag = pdag2dag(res2)
+
 # lo siguiente tarda en correr
 res = hc(training.set)                 # learn BN structure on training set data 
 fitted = bn.fit(res, training.set)     # learning of parameters
