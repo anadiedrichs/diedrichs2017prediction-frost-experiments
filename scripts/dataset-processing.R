@@ -18,7 +18,7 @@ library(timeDate)
 #' Dataset inta-junin : 20 sensores de temperatura en parcela 100x100 del Ing Agr Javier Chaar
 #' 
 
-all.dataset.list <<- c("dacc","dacc-temp","dacc-spring","inta") # all available datasets
+all.dataset.list <<- c("dacc","dacc-temp","dacc-spring","inta","ur","ur-temp") # all available datasets
 dataset.list <<- NULL
 dataset <<- c("dacc")#,"dacc","dacc-temp") #,"dacc-spring") 
 
@@ -26,7 +26,7 @@ get.list.of.datasets <- function(name){
   
   if(name=="dacc"){dataset.list <<- c("dacc","dacc-temp","dacc-spring")}
   else if(name=="inta") {dataset.list <<- c("inta")}
-  else if(name=="ur") {dataset.list <<- NULL}
+  else if(name=="ur") {dataset.list <<- c("ur","ur-temp")}
   else stop("ERROR get.list.of.datasets, possible values are dacc, inta or ur")
   
   return(dataset.list)
@@ -38,9 +38,30 @@ get.dataset <- function(d)
   if(d==all.dataset.list[1]) return(dacc_v2())
   else if(d==all.dataset.list[2]) return(dacc.temp_v2())
   else if(d==all.dataset.list[3]) return(dacc.spring_v2())
-  else if(d==all.dataset.list[4]) return(inta_data()) #TODO
+  else if(d==all.dataset.list[4]) return(inta_data()) 
+  else if(d==all.dataset.list[5]) return(ur_data())
+  else if(d==all.dataset.list[5]) return(ur_temp_data())
   else stop("ERROR get.dataset, you muss pass the correct argument value")
 }
+ur_data <- function()
+{
+  sensores <-  dataset_UR_diarios <- read_csv("~/phd-repos/tmin/bnlearn/data/dataset_UR_diarios.csv")
+  pred_sensores <- colnames(ss)[which(grepl("temp-min",colnames(ss),fixed = TRUE))]
+  return(list(data=sensores, pred= pred_sensores,name="ur"))
+}
+ur_temp_data <- function()
+{
+  sensores <-  dataset_UR_diarios <- read_csv("~/phd-repos/tmin/bnlearn/data/dataset_UR_diarios.csv")
+  humRelCol <- colnames(ss)[which(grepl("Hum",colnames(ss),fixed = TRUE))]
+  soilHumCol <- colnames(ss)[which(grepl("soil",colnames(ss),fixed = TRUE))]
+  sensores <- sensores[-which(colnames(sensores) %in% c(humRelCol,soilHumCol))]
+  sensores <- sensores[-1] # quito columna X1 que enumera las filas
+  pred_sensores <- colnames(ss)[which(grepl("temp-min",colnames(ss),fixed = TRUE))]
+  
+  return(list(data=sensores, pred= pred_sensores,name="ur_temp"))
+
+}
+
 
 inta_data <- function()
 {
