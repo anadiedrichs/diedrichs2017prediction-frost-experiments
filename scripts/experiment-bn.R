@@ -12,7 +12,7 @@ PATH.MODELS <- "./models-ur/"
 PATH.RESULTS <- "./results-ur/"
 PATH.SAVE.DATASET <- "./datasets-ur/"
 #' True for parallel cluster execution (run only on server, not desktop), false for sequential execution
-PAR <- FALSE
+PAR <- TRUE
 # si quiero guardar los dataset desfasados para ser usados por otras librerías.
 SAVE_DATASET <- TRUE
 # arguments for doparallel
@@ -71,7 +71,7 @@ columnas <- paste("dataset","days","ncol","nrow","config_train","alg","score",
 #"ntrain", "ntest",
 write(columnas,file=RESUMEN)
 
-foreach(j = 1:length(dataset),.packages = packages,.export=exports) %dopar% # volver 2 como 1 para correr dataset dacc
+foreach(j = 1:length(dataset),.packages = packages) %dopar% # volver 2 como 1 para correr dataset dacc
 #for(j in 1:length(dataset)) # POR cada uno de los datasets
 {
  # traigo dataset 
@@ -83,7 +83,7 @@ foreach(j = 1:length(dataset),.packages = packages,.export=exports) %dopar% # vo
   pred_sensores_base <- dd$pred
   Log(paste("DATASET ",dd$name,sep = ""))
   
-foreach(t = 1:length(period),.packages = packages,.export=exports) %dopar% 
+  foreach(t = 1:length(period),.packages = packages) %dopar% 
 # for(t in 1:length(period))
   {
     Log(paste("Period ",period[t]))
@@ -99,13 +99,13 @@ foreach(t = 1:length(period),.packages = packages,.export=exports) %dopar%
     wl <<- get_whitelist(pred_sensores,colnames(df),TMIN_CHAAR)
     print(wl)
 
- foreach(a = 1:length(alg),.packages = packages,.export=exports) %dopar% 
+    foreach(a = 1:length(alg),.packages = packages,.export=exports) %dopar% 
 #    for(a in 1:length(alg))
     {
       Log("Alg ",alg[a])
 
-   foreach(c = 1:length(config.train),.packages = packages,.export=exports) %dopar%  # 
-#      for(c in 1:length(config.train))
+     foreach(c = 1:length(config.train),.packages = packages) %dopar%  # 
+    #  for(c in 1:length(config.train))
       {
         u <- NULL
         #' ### Training set y test dataset
@@ -120,7 +120,7 @@ foreach(t = 1:length(period),.packages = packages,.export=exports) %dopar%
 
         }else{
           
-          foreach(s = 1:length(score),.packages = packages,.export=exports) %dopar%
+          foreach(s = 1:length(score),.packages = packages) %dopar%
           #for(s in 1:length(score))
           {
             file.name <- paste(dd$name,period[t],config.train[c],alg[a],score[s],sep = "--")
@@ -135,8 +135,8 @@ foreach(t = 1:length(period),.packages = packages,.export=exports) %dopar%
               
             }else if(config.train[c]=="smote")
             {
-              for(p in 1:length(pred_sensores))
-              #foreach(p = 1:length(pred_sensores),.packages = packages) %dopar% 
+              #for(p in 1:length(pred_sensores))
+              foreach(p = 1:length(pred_sensores),.packages = packages) %dopar% 
               {
                 
                 fn <- paste(file.name, pred_sensores[p],sep="--")
