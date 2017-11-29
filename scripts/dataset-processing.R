@@ -46,17 +46,17 @@ get.dataset <- function(d)
 ur_data <- function()
 {
   sensores <-  dataset_UR_diarios <- read_csv("~/phd-repos/tmin/bnlearn/data/dataset_UR_diarios.csv")
-  pred_sensores <- colnames(ss)[which(grepl("temp-min",colnames(ss),fixed = TRUE))]
+  pred_sensores <- colnames(sensores)[which(grepl("temp-min",colnames(sensores),fixed = TRUE))]
   return(list(data=sensores, pred= pred_sensores,name="ur"))
 }
 ur_temp_data <- function()
 {
   sensores <-  dataset_UR_diarios <- read_csv("~/phd-repos/tmin/bnlearn/data/dataset_UR_diarios.csv")
-  humRelCol <- colnames(ss)[which(grepl("Hum",colnames(ss),fixed = TRUE))]
-  soilHumCol <- colnames(ss)[which(grepl("soil",colnames(ss),fixed = TRUE))]
+  humRelCol <- colnames(sensores)[which(grepl("Hum",colnames(sensores),fixed = TRUE))]
+  soilHumCol <- colnames(sensores)[which(grepl("soil",colnames(sensores),fixed = TRUE))]
   sensores <- sensores[-which(colnames(sensores) %in% c(humRelCol,soilHumCol))]
   sensores <- sensores[-1] # quito columna X1 que enumera las filas
-  pred_sensores <- colnames(ss)[which(grepl("temp-min",colnames(ss),fixed = TRUE))]
+  pred_sensores <- colnames(sensores)[which(grepl("temp-min",colnames(sensores),fixed = TRUE))]
   
   return(list(data=sensores, pred= pred_sensores,name="ur_temp"))
 
