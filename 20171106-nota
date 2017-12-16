@@ -1,0 +1,49 @@
+importance(model) 
+### %IncMSE
+
+if a predictor is important in your current model, then assigning other values for that predictor randomly but 'realistically' (i.e.: permuting this predictor's values over your dataset), should have a negative influence on prediction, i.e.: using the same model to predict from data that is the same except for the one variable, should give worse predictions.
+
+So, you take a predictive measure (MSE) with the original dataset and then with the 'permuted' dataset, and you compare them somehow. One way, particularly since we expect the original MSE to always be smaller, the difference can be taken. Finally, for making the values comparable over variables, these are scaled.
+
+==================
+However, when you use the importance function, the default for the scale argument is TRUE which returns the importance values divided by the standard error. If you use importance(rf.model scale=FALSE) the values should be the same.
+
+I would highly recommend using the %IncMSE and not the GINI (IncNodePurity). The %IncMSE is permuted, at the nodes, and is a more stable representation of variable importance. 
+==============
+%IncMSE is the most robust and informative measure. It is the increase in mse of predictions(estimated with out-of-bag-CV) as a result of variable j being permuted(values randomly shuffled).
+
+    grow regression forest. Compute OOB-mse, name this mse0.
+    for 1 to j var: permute values of column j, then predict and compute OOB-mse(j)
+    %IncMSE of j'th is (mse(j)-mse0)/mse0 * 100%
+
+the higher number, the more important
+
+IncNodePurity relates to the loss function which by best splits are chosen. The loss function is mse for regression and gini-impurity for classification. More useful variables achieve higher increases in node purities, that is to find a split which has a high inter node 'variance' and a small intra node 'variance'. IncNodePurity is biased and should only be used if the extra computation time of calculating %IncMSE is unacceptable. Since it only takes ~5-25% extra time to calculate %IncMSE, this would almost never happen.
+
+============
+
+Node impurity
+
+ at each split, you can calculate how much this split reduces node impurity (for regression trees, indeed, the difference between RSS before and after the split). This is summed over all splits for that variable, over all trees.
+
+####### Variable importance
+
+
+Random Forest importance metrics as implemented in the randomForest package in R have quirks in that correlated predictors get low importance values.
+
+http://bioinformatics.oxfordjournals.org/content/early/2010/04/12/bioinformatics.btq134.full.pdf
+
+I have a modified implementation of random forests out on CRAN which implements their approach of estimating empirical p values and false discovery rates, here
+
+http://cran.r-project.org/web/packages/pRF/index.html
+
+## random forest 
+
+The Random forest algorithm is an ensemble method which uses random sampling of cases (bootstrap) and variables (mtry parameter). The out-of-bag sample is used to derive a measure of variable importance (using a permutation technique) and assess cases proximities through a voting process (number of times two individual ended up in the same leave divided by the number of trees). Viewed as a black box, I don't think RF yields such an easy interpretation (yet it outperforms many competive algorithms which are easier to decipher)
+
+#### proximity
+
+Proximity is the proportion how often two data points end in the same leaf node for different trees.
+
+
+
