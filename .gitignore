@@ -69,4 +69,7 @@ Read the Docs
 config.rst
 
 /.project
-/.pydevproject
+
+# Shiny token, see https://shiny.rstudio.com/articles/shinyapps.html
+rsconnect/
+
