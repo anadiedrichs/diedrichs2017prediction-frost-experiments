@@ -1,5 +1,5 @@
-library(bnlearn)
-library(caret) # para confusion matrix
+#library(bnlearn)
+#library(caret) # para confusion matrix
 library(forecast) # para metodo accuracy
 
 
@@ -7,7 +7,8 @@ library(forecast) # para metodo accuracy
 #' o = observed or real values
 RMSE = function(m, o){  sqrt(mean((m - o)^2)) } #tested
 rsq <- function(x, y){ summary(lm(y~x))$r.squared } #tested
-#' pred & obs are vectors or arrays with the same length
+#' pred & obs must be numeric vectors or arrays with the same length
+#' 
 evaluate <- function(pred, obs) #tested
 {
   #"RMSE","r2","Sensitivity","Acc","Precision"
@@ -22,6 +23,22 @@ evaluate <- function(pred, obs) #tested
   c <- confusionMatrix(y_pred,y)
   acc <- round(c$overall["Accuracy"],2)
   return(list(rmse = rmse, r2 = r2, sens= sens, spec= spec, prec= p, acc= acc))
+}
+#' pred and obs are factor vectors of the same levels. 
+evaluate.classification <- function(pred, obs) #tested
+{
+  #"RMSE","r2","Sensitivity","Acc","Precision"
+#  rmse <- round(RMSE(pred,obs),2)
+#  r2 <- round(rsq(obs,pred),2)
+#  breaks <- c(-20,0,50) # caso Helada y no helada
+  y <- obs
+  y_pred <- pred
+  sens <- round(sensitivity(y_pred,y),2)
+  spec <- round(specificity(y_pred, y),2)
+  p <- round(precision(y_pred,y),2)
+  c <- confusionMatrix(y_pred,y) # que otras metricas sacamos de la matriz de confusion 
+  acc <- round(c$overall["Accuracy"],2)
+  return(list( sens= sens, spec= spec, prec= p, acc= acc))
 }
 
 #' blacklist: las variables predictoras no pueden conectarse entre ellas
