@@ -33,12 +33,14 @@ evaluate.classification <- function(pred, obs) #tested
 #  breaks <- c(-20,0,50) # caso Helada y no helada
   y <- obs
   y_pred <- pred
-  sens <- round(sensitivity(y_pred,y),2)
-  spec <- round(specificity(y_pred, y),2)
-  p <- round(precision(y_pred,y),2)
-  c <- confusionMatrix(y_pred,y) # que otras metricas sacamos de la matriz de confusion 
+  c <- confusionMatrix(y_pred,y,mode="everything") # que otras metricas sacamos de la matriz de confusion 
+  
+  sens <- round(c$byClass["Sensitivity"],2)
+  spec <- round(c$byClass["Specificity"],2)
+  p <- round(c$byClass["Precision"],2)
+  FAR <- round(c$table[1,2] / (c$table[1,2] + c$table[1,1]),2)
   acc <- round(c$overall["Accuracy"],2)
-  return(list( sens= sens, spec= spec, prec= p, acc= acc))
+  return(list( sens= sens, spec= spec, prec= p, acc= acc, far = FAR, cm = c))
 }
 
 #' blacklist: las variables predictoras no pueden conectarse entre ellas
