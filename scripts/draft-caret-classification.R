@@ -23,7 +23,7 @@ packages <- c("randomForest","caret","DMwR","readr","xts","timeDate")
 # si quiero guardar los modelos en .RData file 
 SAVE_MODEL <- TRUE
 # si quiero que los experimentos se ejecuten paralelamente en clusters o secuencialmente (porque estoy en debug o rstudio)
-PAR <- TRUE
+PAR <- FALSE
 #normal: just split train and test set, smote: oversampling of the minority class.
 config.train <-c("normal","smote")
 config.vars <-c("local","all") #only local variables or all variables.
@@ -34,7 +34,7 @@ period <- c(1,2,3,4)#,5)
 porc_train = 0.68
 breaks <- c(-20,0,50) # caso Helada y no helada
 # rf: random forest, glm: logistic regression
-models <- c("glm","rf")
+models <- c("rpart","C5.0","glm","rf")
 # variable cuyo valor cambia segun configuracion for
 samp = "none" 
 tuneParLen = 1 
@@ -71,20 +71,10 @@ settingMySeeds <- function(model,tunelen)
   if(model=="glm") ss <- setSeeds(numbers=KFOLD,seed = SEED)
   if(model=="rf")  ss <- setSeeds(numbers=KFOLD,tunes = tunelen,seed = SEED)
   if(model=="C5.0") ss <- setSeeds(numbers=KFOLD,tunes = nrow(gridC50),seed = SEED)
+  if(model=="rpart") ss <- setSeeds(numbers=KFOLD,tunes = tunelen,seed = SEED)
   ss
 }
-# var: nombre variable a predecir,ejemplo *_tmin
-# variables: colnames o conjunto de variables del dataset
-vars.del.sensor <- function(var,variables,dataset_tmin_chaar=FALSE)
-{
-  v <- variables
-  sensor <- unlist(strsplit(var,split=".",fixed = TRUE))[1]
-  if(dataset_tmin_chaar==TRUE) sensor <- paste(sensor,".",sep="") # esto es lo diferente, por bug #
-  
-  vars <- v[grepl( sensor, v, fixed = TRUE)] # extraigo todas las variables relacionadas con sensor
-  
-  return(vars)
-}
+
 
 #' function to call each model through caret
 train.models <- function(trCtrl, X, Y,data, modelName,tp)
@@ -107,7 +97,14 @@ train.models <- function(trCtrl, X, Y,data, modelName,tp)
   } else if(modelName == "C5.0")
   {
     
-    mdl<- train(x=X,y=Y,tuneGrid=gridC50,trControl=trctrl,method="C5.0",verbose=FALSE)
+    model<- train(x=X,y=Y,tuneGrid=gridC50,trControl=trCtrl,method="C5.0",metric="ROC",verbose=FALSE)
+    
+  }else if(modelName == "rpart")
+  {
+    
+    set.seed(SEED)
+    model <- train(y.disc ~., data = data, method = "rpart", trControl=trCtrl,tuneLength = 10,
+                   metric="ROC", parms=list(split='information'))
     
   } 
   
@@ -247,8 +244,12 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
             #varimp model o lista de variables importantes
             vv <- varImp(model) # si tiene varImpModel
             write.csv(x = as.data.frame(vv$importance),file = paste(PATH.RESULTS,file.name,"--importance.csv",sep = ""))
-            pred <- predict(model,test.set)
+            png(paste(PATH.RESULTS,file.name,"--importance.png",sep = ""))
+            print(plot(varImp(model)))
+            dev.off()
             
+            # predictions
+            pred <- predict(model,test.set)
             #ppp <- extractPrediction(list(model),testX =test.set[,colnames(test.set)!=pred_sensores[p]])
             probb <- extractProb(list(model),testX =test.set[,colnames(test.set)!=pred_sensores[p]])
             tcs <- twoClassSummary(probb,lev=levels(probb$obs))
