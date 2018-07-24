@@ -6,7 +6,6 @@ library(caret)
 source("bnlearn-utils.R")
 source("dataset-processing.R")
 
-set.seed(147)
 #dataset <- c("dacc")#,"dacc","dacc-temp") #,"dacc-spring") 
 #dataset <<- get.list.of.datasets(DATA)
 VERBOSE <- TRUE
@@ -25,7 +24,7 @@ packages <- c("randomForest","caret","DMwR","readr","xts","timeDate")
 SAVE_MODEL <- TRUE
 # si quiero que los experimentos se ejecuten paralelamente en clusters o secuencialmente (porque estoy en debug o rstudio)
 PAR <- TRUE
-#
+#normal: just split train and test set, smote: oversampling of the minority class.
 config.train <-c("normal","smote")
 config.vars <-c("local","all") #only local variables or all variables.
 #' T cuantos dias anteriores tomamos
@@ -39,10 +38,39 @@ models <- c("glm","rf")
 # variable cuyo valor cambia segun configuracion for
 samp = "none" 
 tuneParLen = 1 
-
+SEED <- 147
+seeds <- NULL
+KFOLD <- 10
 lista <- list()
 ################
+# from http://jaehyeon-kim.github.io/2015/05/Setup-Random-Seeds-on-Caret-Package.html
+setSeeds <- function(method = "cv", numbers = 1, repeats = 1, tunes = NULL, seed = 1237) {
+  #B is the number of resamples and integer vector of M (numbers + tune length if any)
+  B <- if (method == "cv") numbers
+  else if(method == "repeatedcv") numbers * repeats
+  else NULL
+  
+  if(is.null(length)) {
+    seeds <- NULL
+  } else {
+    set.seed(seed = seed)
+    seeds <- vector(mode = "list", length = B)
+    seeds <- lapply(seeds, function(x) sample.int(n = 1000000, size = numbers + ifelse(is.null(tunes), 0, tunes)))
+    seeds[[length(seeds) + 1]] <- sample.int(n = 1000000, size = 1)
+  }
+  # return seeds
+  seeds
+}
 
+settingMySeeds <- function(model,tunelen)
+{ 
+  ss <- NULL
+  
+  if(model=="glm") ss <- setSeeds(numbers=KFOLD,seed = SEED)
+  if(model=="rf")  ss <- setSeeds(numbers=KFOLD,tunes = tunelen,seed = SEED)
+  
+  ss
+}
 # var: nombre variable a predecir,ejemplo *_tmin
 # variables: colnames o conjunto de variables del dataset
 vars.del.sensor <- function(var,variables,dataset_tmin_chaar=FALSE)
@@ -65,12 +93,13 @@ train.models <- function(trCtrl, X, Y,data, modelName,tp)
   if(modelName == "rf")
   {
     # rf tune grid
+    set.seed(SEED)
     model <- train(x=X,y=Y,method="rf",trControl = trCtrl, metric="ROC",importance=T, tuneLength=tp)
     
   }else if(modelName == "glm")
   {
-    # ?? tune grid
     
+    set.seed(SEED)
     model <- train(y.disc ~ ., data = data, method="glm", family="binomial",trControl = trCtrl, metric="ROC")
     
   } 
@@ -128,7 +157,7 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
   X <- training.set[,-which(colnames(sensores) %in% pred_sensores)]
   #pred_sensores <- pred_sensores[1:2]
   
-  #foreach(p = 1:length(pred_sensores),.packages = packages) %dopar% # arranca en 2 para evitar procesar junin
+  #foreach(p = 1:length(pred_sensores),.packages = packages) %dopar% # 
    for(p in 1:length(pred_sensores)) 
   {
     
@@ -164,6 +193,7 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
           X <- X[,vars]
           data <- cbind(X,y.disc)
           tuneParLen = 1 
+          
         }else{
           
           X <- training.set[,-which(colnames(sensores) %in% pred_sensores)]
@@ -180,14 +210,18 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
           fila_header <- cbind(dd$name,pred_sensores[p],config.train[ct],config.vars[cvars],t)
           name_header <- paste(dd$name,pred_sensores[p],config.train[ct],config.vars[cvars],t,sep = "--")
           
-          #timeSlicesTrain <- createTimeSlices(1:nrow(training.set),initialWindow = T,horizon = 1,fixedWindow = TRUE)
-          my.train.control <- trainControl(method = "cv", number = 10, 
-                                           initialWindow = t, horizon = 1, fixedWindow = TRUE,
-                                           sampling = samp
-                                           ,classProbs = TRUE, summaryFunction = twoClassSummary)
           
           for(mod in models)
           {
+            seeds <- settingMySeeds(mod,tuneParLen)
+            #timeSlicesTrain <- createTimeSlices(1:nrow(training.set),initialWindow = T,horizon = 1,fixedWindow = TRUE)
+            my.train.control <- trainControl(method = "cv", number = KFOLD, 
+                                             initialWindow = t, horizon = 1, fixedWindow = TRUE,
+                                             sampling = samp
+                                             ,classProbs = TRUE, summaryFunction = twoClassSummary,
+                                             seeds = seeds)
+            
+            
             start_time <- Sys.time()
             model <- train.models(trCtrl=my.train.control, X=X, Y=y.disc,data=data, modelName=mod, tp = tuneParLen)
             end_time <- Sys.time()
@@ -223,7 +257,6 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
             Log(row)
             
             # agregar modelo a una lista 
-            # name <- paste(varpred,"rf",T,sep="-")
             lista[[file.name]] <- model
             
           }# for each model
@@ -241,7 +274,7 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
     print(dotplot(resamps))
     dev.off()
     lista <- list()
-  }# for por cada sensor o estacion a predecir la minima
-}# for por dataset
+  }# for por cada sensor o estacion a predecir helada/no helada
+}# for dataset
 
 if(PAR==TRUE){stopCluster(cl)}
