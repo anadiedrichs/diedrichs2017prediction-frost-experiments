@@ -20,25 +20,25 @@ PATH.RESULTS <- "./results/"
 PATH.SAVE.DATASET <- "./datasets/"
 
 packages <- c("randomForest","caret","DMwR","readr","xts","timeDate")
-# si quiero que solo tome las variables de la misma ubicacion y no las vecinas
-LOCAL <- FALSE
+
 # si quiero guardar los modelos en .RData file 
 SAVE_MODEL <- TRUE
 # si quiero que los experimentos se ejecuten paralelamente en clusters o secuencialmente (porque estoy en debug o rstudio)
-PAR <- FALSE
+PAR <- TRUE
 #
 config.train <-c("normal","smote")
 config.vars <-c("local","all") #only local variables or all variables.
 #' T cuantos dias anteriores tomamos
-period <- c(1)#,2,3,4)#,5)
+period <- c(1,2,3,4)#,5)
 #tunegrid <- expand.grid(.mtry=c(10:25),.ntree=seq(from=500,to=2500,by=500))
 # porcentaje para train set split
 porc_train = 0.68
 breaks <- c(-20,0,50) # caso Helada y no helada
 # rf: random forest, glm: logistic regression
 models <- c("glm","rf")
-
-samp = "none"
+# variable cuyo valor cambia segun configuracion for
+samp = "none" 
+tuneParLen = 1 
 
 lista <- list()
 ################
@@ -57,7 +57,7 @@ vars.del.sensor <- function(var,variables,dataset_tmin_chaar=FALSE)
 }
 
 #' function to call each model through caret
-train.models <- function(trCtrl, X, Y,data, modelName)
+train.models <- function(trCtrl, X, Y,data, modelName,tp)
 {
   
   model = NULL
@@ -65,7 +65,7 @@ train.models <- function(trCtrl, X, Y,data, modelName)
   if(modelName == "rf")
   {
     # rf tune grid
-    model <- train(x=X,y=Y,method="rf",trControl = trCtrl, metric="ROC",tuneLength=5,importance=T)
+    model <- train(x=X,y=Y,method="rf",trControl = trCtrl, metric="ROC",importance=T, tuneLength=tp)
     
   }else if(modelName == "glm")
   {
@@ -92,7 +92,7 @@ smotest <- list(name = "SMOTE-k.10-p.300",
                 first = TRUE)
 #WARNING!! OJO! time and resource consuming! run only in dedicated server
 if(PAR==TRUE){
-  cl <- makeCluster(detectCores(),outfile=paste(OUTPUT.FILE ,Sys.time(),".log",sep="")) # colocar detectCores() en server  en vez de 4
+  cl <- makePSOCKcluster(detectCores(),outfile=paste(OUTPUT.FILE ,Sys.time(),".log",sep="")) # colocar detectCores() en server  en vez de 4
   registerDoParallel(cl)
 }
 
@@ -101,7 +101,7 @@ columnas <- paste("dataset","var","config.train","config.vars","T","alg","t_run_
                   "Accuracy","Kappa","AccuracyLower","AccuracyUpper","AccuracyNull","AccuracyPValue",
                   "McnemarPValue","Sensitivity","Specificity","Pos Pred Value","Neg Pred Value",
                   "Precision","Recall","F1","Prevalence","Detection Rate","Detection Prevalence",
-                  "Balanced Accuracy",sep = ",")
+                  "Balanced Accuracy","ROC", "Sens", "Spec",sep = ",")
 
 write(columnas,file=RESUMEN)
 
@@ -133,8 +133,18 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
   {
     
     Y <- as.numeric(training.set[,pred_sensores[p]])
+    #' discretizar valores en helada y no helada, con nombres admisibles como make.names
+    real <- test.set[,pred_sensores[p]]
+    real[which(real <=0)] <- "frost" # frost
+    real[which(real !="frost")] <- "notfrost" # NO frost
+    real <- as.factor(real)
+    y.disc <- as.vector(Y)
+    y.disc[which(y.disc <=0)] <- "frost"
+    y.disc[which(y.disc !="frost")] <- "notfrost"
+    y.disc <- as.factor(y.disc)
     Log(pred_sensores[p])
-   # foreach(c = 1:length(config.train),.packages = packages) %dopar%  # 
+   
+    # foreach(c = 1:length(config.train),.packages = packages) %dopar%  # 
   for(ct in 1:length(config.train))
     {
       Log("config.train ",config.train[ct])
@@ -146,25 +156,19 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
       for(cvars in 1:length(config.vars))
       {
         Log("config.vars ",config.vars[cvars])
-        #' discretizar valores en helada y no helada, con nombres admisibles como make.names
-        real <- test.set[,pred_sensores[p]]
-        real[which(real <=0)] <- 0 # frost
-        real[which(real >0)] <- 1 # NO frost
-        y.disc <- as.vector(Y)
-        y.disc[which(y.disc <=0)] <- 0
-        y.disc[which(y.disc > 0)] <- 1
 
-        data <- cbind(X,y.disc)
         
         if(config.vars[cvars]=="local")
         {
           vars <- vars.del.sensor(pred_sensores[p],colnames(X))
           X <- X[,vars]
           data <- cbind(X,y.disc)
+          tuneParLen = 1 
         }else{
           
           X <- training.set[,-which(colnames(sensores) %in% pred_sensores)]
           data <- cbind(X,y.disc)
+          tuneParLen = 5
         }
         
         #foreach(t = 1:length(period),.packages = packages) %dopar% 
@@ -177,7 +181,7 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
           name_header <- paste(dd$name,pred_sensores[p],config.train[ct],config.vars[cvars],t,sep = "--")
           
           #timeSlicesTrain <- createTimeSlices(1:nrow(training.set),initialWindow = T,horizon = 1,fixedWindow = TRUE)
-          my.train.control <- trainControl(method = "cv", number = 5, 
+          my.train.control <- trainControl(method = "cv", number = 10, 
                                            initialWindow = t, horizon = 1, fixedWindow = TRUE,
                                            sampling = samp
                                            ,classProbs = TRUE, summaryFunction = twoClassSummary)
@@ -185,7 +189,7 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
           for(mod in models)
           {
             start_time <- Sys.time()
-            model <- train.models(trCtrl=my.train.control, X=X, Y=y.disc,data=data, modelName=mod)
+            model <- train.models(trCtrl=my.train.control, X=X, Y=y.disc,data=data, modelName=mod, tp = tuneParLen)
             end_time <- Sys.time()
             runtime <- round(as.numeric(difftime(end_time, start_time, units = "secs")),3)
             
@@ -203,15 +207,18 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
             write.csv(x = as.data.frame(vv$importance),file = paste(PATH.RESULTS,file.name,"--importance.csv",sep = ""))
             pred <- predict(model,test.set)
             
+            #ppp <- extractPrediction(list(model),testX =test.set[,colnames(test.set)!=pred_sensores[p]])
+            probb <- extractProb(list(model),testX =test.set[,colnames(test.set)!=pred_sensores[p]])
+            tcs <- twoClassSummary(probb,lev=levels(probb$obs))
             # guardar csv con valor real vs predicho
-            dat <- as.data.frame(cbind(test.set[pred_sensores[p]],pred))
+            dat <- as.data.frame(cbind(real,pred))
             colnames(dat)<- c("y_real","y_pred")
             write.csv(x = dat,file = paste(PATH.RESULTS,file.name,"--Y-vs-Y_pred.csv",sep = ""))
             # evaluar en testeo
             eee <- evaluate.classification(pred, real)
             # guardo detalles del experimento
             #row <- paste(fila,eee$sens,eee$acc,eee$prec,eee$spec,"param1","param2",sep=",")
-            row <- cbind(fila,eee$far,t(eee$cm$overall),t(eee$cm$byClass))
+            row <- cbind(fila,eee$far,t(eee$cm$overall),t(eee$cm$byClass),t(tcs))
             write.table(row, file=RESUMEN, append = TRUE,row.names = FALSE,col.names = FALSE, sep = ",")
             Log(row)
             
@@ -226,12 +233,12 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
     }# for each config.train
     # plot y results de resample de los modelos 
     resamps <- resamples(lista)
-    summary(resamps)
-    png(paste(dataset[j],pred_sensores[p],"bwplot.png",sep="--"))
-    bwplot(resamps)
+    write.csv(resamps$values,file=paste(PATH.RESULTS,dataset[j],"--",pred_sensores[p],"--resamples.csv",sep=""))
+    png(paste(PATH.RESULTS,dataset[j],"--",pred_sensores[p],"--bwplot.png",sep=""))
+    print(bwplot(resamps))
     dev.off()
-    png(paste(dataset[j],pred_sensores[p],"dotplot.png",sep="--"))
-    dotplot(resamps)
+    png(paste(PATH.RESULTS,dataset[j],"--",pred_sensores[p],"--dotplot.png",sep=""))
+    print(dotplot(resamps))
     dev.off()
     lista <- list()
   }# for por cada sensor o estacion a predecir la minima
