@@ -42,6 +42,8 @@ SEED <- 147
 seeds <- NULL
 KFOLD <- 10
 lista <- list()
+gridC50 <- expand.grid( .winnow = c(TRUE,FALSE), .trials=c(1,5,10,15,20), .model="tree" )
+
 ################
 # from http://jaehyeon-kim.github.io/2015/05/Setup-Random-Seeds-on-Caret-Package.html
 setSeeds <- function(method = "cv", numbers = 1, repeats = 1, tunes = NULL, seed = 1237) {
@@ -68,7 +70,7 @@ settingMySeeds <- function(model,tunelen)
   
   if(model=="glm") ss <- setSeeds(numbers=KFOLD,seed = SEED)
   if(model=="rf")  ss <- setSeeds(numbers=KFOLD,tunes = tunelen,seed = SEED)
-  
+  if(model=="C5.0") ss <- setSeeds(numbers=KFOLD,tunes = nrow(gridC50),seed = SEED)
   ss
 }
 # var: nombre variable a predecir,ejemplo *_tmin
@@ -101,6 +103,11 @@ train.models <- function(trCtrl, X, Y,data, modelName,tp)
     
     set.seed(SEED)
     model <- train(y.disc ~ ., data = data, method="glm", family="binomial",trControl = trCtrl, metric="ROC")
+    
+  } else if(modelName == "C5.0")
+  {
+    
+    mdl<- train(x=X,y=Y,tuneGrid=gridC50,trControl=trctrl,method="C5.0",verbose=FALSE)
     
   } 
   
@@ -154,7 +161,8 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
   training.set <- as.data.frame(sensores[ trainIndex,])
   test.set  <- as.data.frame(sensores[-trainIndex,])
   
-  X <- training.set[,-which(colnames(sensores) %in% pred_sensores)]
+  #X <- training.set[,-which(colnames(sensores) %in% pred_sensores)]
+  X <- training.set
   #pred_sensores <- pred_sensores[1:2]
   
   #foreach(p = 1:length(pred_sensores),.packages = packages) %dopar% # 

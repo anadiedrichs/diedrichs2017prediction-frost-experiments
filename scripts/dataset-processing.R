@@ -43,6 +43,20 @@ get.dataset <- function(d)
   else if(d==all.dataset.list[5]) return(ur_temp_data())
   else stop("ERROR get.dataset, you muss pass the correct argument value")
 }
+
+# var: nombre variable a predecir,ejemplo *_tmin
+# variables: colnames o conjunto de variables del dataset
+vars.del.sensor <- function(var,variables,dataset_tmin_chaar=FALSE)
+{
+  v <- variables
+  sensor <- unlist(strsplit(var,split=".",fixed = TRUE))[1]
+  if(dataset_tmin_chaar==TRUE) sensor <- paste(sensor,".",sep="") # esto es lo diferente, por bug #
+  
+  vars <- v[grepl( sensor, v, fixed = TRUE)] # extraigo todas las variables relacionadas con sensor
+  
+  return(vars)
+}
+
 ur_data <- function()
 {
   sensores <-  dataset_UR_diarios <- read_csv("~/phd-repos/tmin/bnlearn/data/dataset_UR_diarios.csv")
