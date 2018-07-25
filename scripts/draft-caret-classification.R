@@ -201,7 +201,7 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
           
         }else{
           
-          X <- training.set[,-which(colnames(sensores) %in% pred_sensores)]
+          X <- training.set #[,-which(colnames(sensores) %in% pred_sensores)]
           data <- cbind(X,y.disc)
           tuneParLen = 5
         }
