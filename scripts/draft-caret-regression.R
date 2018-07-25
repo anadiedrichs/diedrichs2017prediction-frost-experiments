@@ -28,7 +28,7 @@ PAR <- FALSE
 config.train <-c("normal")#,"smote")
 config.vars <-c("local","all") #only local variables or all variables.
 #' T cuantos dias anteriores tomamos
-period <- c(1,2,3,4)#,5)
+period <- c(1)#,2,3,4)#,5)
 #tunegrid <- expand.grid(.mtry=c(10:25),.ntree=seq(from=500,to=2500,by=500))
 # porcentaje para train set split
 porc_train = 0.68
@@ -211,6 +211,11 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
             #varimp model o lista de variables importantes
             vv <- varImp(model) # si tiene varImpModel
             write.csv(x = as.data.frame(vv$importance),file = paste(PATH.RESULTS,file.name,"--importance.csv",sep = ""))
+            png(paste(PATH.RESULTS,file.name,"--importance.png",sep = ""))
+            print(plot(varImp(model)))
+            dev.off()
+            
+            # prediction on test.set
             pred <- predict(model,test.set)
             
             # guardar csv con valor real vs predicho
