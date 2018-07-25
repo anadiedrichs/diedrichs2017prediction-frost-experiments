@@ -6,6 +6,7 @@ RMSE = function(m, o){  sqrt(mean((m - o)^2)) } #tested
 rsq <- function(x, y){ summary(lm(y~x))$r.squared } #tested
 MAE <- function(m, o){  mean(abs(m - o))} #tested
 
+source("bnlearnRegression.R")
 
 data(learning.test)
 
@@ -24,14 +25,18 @@ fitControl <- trainControl(method = "cv",
 
 set.seed(825)
 bn.model <- caret::train(x= gaussian.test, # dataset con todas las variables
-                         y = gaussian.test$A, # pasar cualquier variable numerica, sera ignorada
+                         y = gaussian.test$A, # pasar cualquier variable numerica, es node
                          data = gaussian.test, 
-                         preProc = c("center", "scale"),
+                         #preProc = c("center", "scale"),
                    method = bnReg, 
                    trControl = fitControl, 
                    node = "A") # importante, sobre cual variable se quiere mejorar la prediccion
 plot(bn.model$finalModel$network)
 print(bn.model)
+
+# varImp no funciona, requiere regresar variables y un número que indique su importancia.
+#vvv <- varImp(bn.model,node="A")
+
 pred <- predict(bn.model,gaussian.test,node="A")
 real <- gaussian.test$A
 MAE(real,pred)
@@ -58,5 +63,7 @@ bn.model <- caret::train(x= gaussian.test, # dataset con todas las variables
                          node = "A") # importante, sobre cual variable se quiere mejorar la prediccion
 plot(bn.model$finalModel$network)
 print(bn.model)
+# EXTRACt de markov blanket of the network
+mb(bn.model$finalModel$network,node="A")
 
 
