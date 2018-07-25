@@ -2,19 +2,22 @@ library(doParallel)
 library(randomForest)
 library(caret)
 library(rpart)
-library(C50)
+library(bnlearn)
 
+source("bnlearnRegression.R")
 source("bnlearn-utils.R")
 source("dataset-processing.R")
 
+# si quiero que los experimentos se ejecuten paralelamente en clusters o secuencialmente (porque estoy en debug o rstudio)
+PAR <- TRUE
 #dataset <- c("dacc")#,"dacc","dacc-temp") #,"dacc-spring") 
 #dataset <<- get.list.of.datasets(DATA)
 VERBOSE <- TRUE
 TMIN_CHAAR <-NULL
 DATA <- "dacc" # possible values: dacc, inta, ur, needed for dataset-processing.R
 if(DATA=="inta"){TMIN_CHAAR <-TRUE}else{TMIN_CHAAR <-FALSE}
-OUTPUT.FILE <- "output-" # <- where prints go while cluster is running
-FILE.RESULT.NAME <- "--experimento-dacc.csv"
+OUTPUT.FILE <- "output-reg-" # <- where prints go while cluster is running
+FILE.RESULT.NAME <- "--experimento-dacc-regression.csv"
 PATH.MODELS <- "./models-reg/"
 PATH.RESULTS <- "./results-reg/"
 
@@ -22,26 +25,24 @@ packages <- c("randomForest","caret","DMwR","readr","xts","timeDate","rpart")
 
 # si quiero guardar los modelos en .RData file 
 SAVE_MODEL <- TRUE
-# si quiero que los experimentos se ejecuten paralelamente en clusters o secuencialmente (porque estoy en debug o rstudio)
-PAR <- FALSE
 #normal: just split train and test set, smote: oversampling of the minority class.
 config.train <-c("normal")#,"smote")
 config.vars <-c("local","all") #only local variables or all variables.
 #' T cuantos dias anteriores tomamos
-period <- c(1)#,2,3,4)#,5)
+period <- c(1)#,2,3,4)#,5) #TODO IN PRODUCTION
 #tunegrid <- expand.grid(.mtry=c(10:25),.ntree=seq(from=500,to=2500,by=500))
 # porcentaje para train set split
 porc_train = 0.68
 breaks <- c(-20,0,50) # caso Helada y no helada
 # rf: random forest, glm: logistic regression
-models <- c("rpart","rf")
+models <- c("bnReg","rpart","rf") #TODO IN PRODUCTION
 # variable cuyo valor cambia segun configuracion for
 samp = "none" 
 tuneParLen = 1 
 
 SEED <- 147
 seeds <- NULL
-KFOLD <- 10
+KFOLD <- 3 #TODO IN PRODUCTION
 lista <- list()
 ################
 # from http://jaehyeon-kim.github.io/2015/05/Setup-Random-Seeds-on-Caret-Package.html
@@ -63,39 +64,44 @@ setSeeds <- function(method = "cv", numbers = 1, repeats = 1, tunes = NULL, seed
   seeds
 }
 
-
-settingMySeeds <- function(model,tunelen)
+settingMySeeds <- function(model,tunelen) #TODO
 { 
   ss <- NULL
   
-  if(model=="rpart") ss <- setSeeds(numbers=KFOLD,tunes = tunelen,seed = SEED)
+  if(model=="rpart") ss <- setSeeds(numbers=KFOLD,tunes = 10,seed = SEED) #TODO tuneLenRpart
   if(model=="rf")  ss <- setSeeds(numbers=KFOLD,tunes = tunelen,seed = SEED)
-  # falta bayesian models 
+  if(model=="bnReg") ss <- setSeeds(numbers=KFOLD,tunes = 8,seed = SEED) # por defecto, 8 parametros a tunear
   ss
 }
 
 
 #' function to call each model through caret
-train.models <- function(trCtrl, X, Y,data, modelName,tp)
+train.models <- function(trCtrl, X, Y,data, modelName,tp, predVar)
 {
-  
+  my.metric = "RMSE"
   model = NULL
   
   if(modelName == "rf")
   {
     # rf tune grid
     set.seed(SEED)
-    model <- train(x=X,y=Y,method="rf",trControl = trCtrl, metric="RMSE",importance=T, tuneLength=tp)
+    model <- train(x=X,y=Y,method="rf",trControl = trCtrl, metric=my.metric,importance=T, tuneLength=tp)
     
   }else if(modelName == "rpart")
   {
-    
     set.seed(SEED)
-    model <- train(y.disc ~., data = data, method = "rpart", trControl=trCtrl,tuneLength = 10,
-                   metric="RMSE", parms=list(split='information'))
+    model <- train(y.disc ~., data = data, method = modelName, trControl=trCtrl,tuneLength = 10, #TODO tuneLenRpart
+                   metric=my.metric, parms=list(split='information'))
      
+  }else if(modelName == "bnReg")
+  {
+    set.seed(SEED)
+    # por defecto entrena en modo grilla o grid
+    model <- train(x= X, y = Y, data = data, 
+                      method = bnReg, metric=my.metric,
+                      trControl = trCtrl, 
+                      node = predVar) 
   }
-  
   model     
   
 }
@@ -108,8 +114,11 @@ if(PAR==TRUE){
 }
 
 RESUMEN <<- paste(Sys.time(),FILE.RESULT.NAME,sep="")
-columnas <- paste("dataset","var","config.train","config.vars","T","alg","t_run_s","RMSE",
-                  "MAE","R2",sep = ",")
+columnas <- paste("dataset","var","config.train","config.vars","T","alg","t_run_s","MAE","RMSE",
+                  "R2","Accuracy","Kappa", "AccuracyLower", "AccuracyUpper", "AccuracyNull", "AccuracyPValue", "McnemarPValue","Sensitivity",
+                  "Specificity", "Pos Pred Value", "Neg Pred Value", "Precision", "Recall", "F1","Prevalence", "Detection Rate",
+                  "Detection Prevalence Balanced", "Accuracy",sep = ",") 
+
 
 write(columnas,file=RESUMEN)
 
@@ -170,13 +179,13 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
           
         }else{
           
-          X <- training.set[,-which(colnames(sensores) %in% pred_sensores)]
+          X <- training.set #[,-which(colnames(sensores) %in% pred_sensores)]
           data <- cbind(X,y.disc)
           tuneParLen = 5
         }
         
         #foreach(t = 1:length(period),.packages = packages) %dopar% 
-        for(t in 1:length(period))
+        for(t in period)
         {
           Log("T value ",t)
           
@@ -184,9 +193,9 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
           fila_header <- cbind(dd$name,pred_sensores[p],config.train[ct],config.vars[cvars],t)
           name_header <- paste(dd$name,pred_sensores[p],config.train[ct],config.vars[cvars],t,sep = "--")
           
-          
           for(mod in models)
           {
+            Log("Model ",mod)
             seeds <- settingMySeeds(mod,tuneParLen)
             #timeSlicesTrain <- createTimeSlices(1:nrow(training.set),initialWindow = T,horizon = 1,fixedWindow = TRUE)
             my.train.control <- trainControl(method = "cv", number = KFOLD, 
@@ -195,7 +204,7 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
             
             
             start_time <- Sys.time()
-            model <- train.models(trCtrl=my.train.control, X=X, Y=y.disc,data=data, modelName=mod, tp = tuneParLen)
+            model <- train.models(trCtrl=my.train.control, X=X, Y=y.disc,data=data, modelName=mod, tp = tuneParLen,predVar=pred_sensores[p])
             end_time <- Sys.time()
             runtime <- round(as.numeric(difftime(end_time, start_time, units = "secs")),3)
             
@@ -204,17 +213,29 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
             
             # save model
             if(SAVE_MODEL){save(model, file = paste(PATH.MODELS,file.name,".RData",sep=""),compress = TRUE)}
-            
-            summary(model)
-            print(model)
-            
+            if(VERBOSE){
+              summary(model)
+              print(model)
+            }
             #varimp model o lista de variables importantes
-            vv <- varImp(model) # si tiene varImpModel
-            write.csv(x = as.data.frame(vv$importance),file = paste(PATH.RESULTS,file.name,"--importance.csv",sep = ""))
-            png(paste(PATH.RESULTS,file.name,"--importance.png",sep = ""))
-            print(plot(varImp(model)))
-            dev.off()
-            
+            if(mod == "bnReg")
+            {
+              #save Markov blanket
+              bnregmb <- mb(model$finalModel$network,node=pred_sensores[p])
+              df.bnregmb <- data.frame(nodes=bnregmb)
+              write.csv(x = df.bnregmb,file = paste(PATH.RESULTS,file.name,"--markovBlanket.csv",sep = ""))
+              # plot Bayesian network
+              png(paste(PATH.RESULTS,file.name,"--BayesianNetwork.png",sep = ""))
+              print(plot(model$finalModel$network))
+              dev.off()
+              
+            }else{ #variable importance list 
+              vv <- varImp(model) # si tiene varImpModel
+              write.csv(x = as.data.frame(vv$importance),file = paste(PATH.RESULTS,file.name,"--importance.csv",sep = ""))
+              png(paste(PATH.RESULTS,file.name,"--importance.png",sep = ""))
+              print(plot(varImp(model)))
+              dev.off()
+            }
             # prediction on test.set
             pred <- predict(model,test.set)
             
@@ -225,7 +246,7 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
             # evaluar en testeo
             eee <- evaluate(pred, real)
             # guardo detalles del experimento
-            row <- cbind(fila,eee$MAE,eee$rmse,eee$r2,t(eee$cm$overall),t(eee$cm$byClass))
+            row <- cbind(fila,eee$MAE,eee$rmse,eee$r2,t(eee$cm$overall),t(eee$cm$byClass)) 
             write.table(row, file=RESUMEN, append = TRUE,row.names = FALSE,col.names = FALSE, sep = ",")
             Log(row)
             
