@@ -47,5 +47,24 @@ bnReg <- list(label = "Bayesian Networks for Regression",
                   prob = NULL,
                   predictors = function(x, ...) names(x),#to check
                   tags = c("Bayesian Model", "Regression", "Bayesian Network"), # to check later
-                  varImp = NULL,
+                  varImp =                   varImp = function(object, ...){
+                    varImp <- randomForest::importance(object, ...)
+                    if(object$type == "regression")
+                      varImp <- data.frame(Overall = varImp[,"%IncMSE"])
+                    else {
+                      retainNames <- levels(object$y)
+                      if(all(retainNames %in% colnames(varImp))) {
+                        varImp <- varImp[, retainNames]
+                      } else {
+                        varImp <- data.frame(Overall = varImp[,1])
+                      }
+                    }
+                    
+                    out <- as.data.frame(varImp)
+                    if(dim(out)[2] == 2) {
+                      tmp <- apply(out, 1, mean)
+                      out[,1] <- out[,2] <- tmp  
+                    }
+                    out
+                  },
                   sort = function(x) x) #TODO
