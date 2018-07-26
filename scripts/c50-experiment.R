@@ -83,29 +83,36 @@ porc_train = 0.68
 #' ### Training set y test dataset
 df[,1:ncol(df)] <- lapply(df[,1:ncol(df)],as.numeric) # <- convertir a numeric
 until <- round(nrow(df)*porc_train)
+
+df[which(df[,y] <= 0),y] <- "frost" 
+df[which(df[,y] != "frost"),y] <- "nofrost" 
+df[,y] <- as.factor(df[,y])
+
 training.set = df[1:until-1, ] # This is training set to learn the parameters
 test.set = df[until:nrow(df), ]
 
+
+
 #' Usando variables vecinas
-treeModel1 <- C5.0(x = training.set[,-31], y= as.factor(training.set$junin.temp_min_t))
+treeModel1 <- C5.0(x = training.set[,-31], y= training.set$junin.temp_min_t,control = C5.0Control(winnow = TRUE))
 pred <- predict.C5.0(treeModel1,test.set)
-pred.num <- as.numeric(levels(pred))[pred]
-evaluate(pred.num,test.set[,y])
+#pred.num <- as.numeric(levels(pred))[pred]
+evaluate.discreto(pred,test.set[,y])
 
 #' Usando sólo variables del sensor mismo
 #'
 vv <- vars.del.sensor(y,colnames(training.set))
 treeModelSolo <- C5.0(x = training.set[,vv], y= as.factor(training.set$junin.temp_min_t))
 pred <- predict.C5.0(treeModelSolo,test.set)
-pred.num <- as.numeric(levels(pred))[pred]
-evaluate(pred.num,test.set[,y])
+#pred.num <- as.numeric(levels(pred))[pred]
+evaluate.discreto(pred,test.set[,y])
 
 #' Probamos con boosting
 #'
 treeModel2 <- C5.0(x = training.set[,-31], y= as.factor(training.set$junin.temp_min_t), trials=50)
 pred <- predict.C5.0(treeModel2,test.set)
-pred.num <- as.numeric(levels(pred))[pred]
-evaluate(pred.num,test.set[,y])
+#pred.num <- as.numeric(levels(pred))[pred]
+evaluate.discreto(pred,test.set[,y])
 
 #' Probamos etiqueta binaria en vez de etiquetas multiples
 breaks <- c(-20,0,50) # caso Helada y no helada
