@@ -9,7 +9,7 @@ source("bnlearn-utils.R")
 source("dataset-processing.R")
 
 # si quiero que los experimentos se ejecuten paralelamente en clusters o secuencialmente (porque estoy en debug o rstudio)
-PAR <- TRUE
+PAR <- FALSE
 #dataset <- c("dacc")#,"dacc","dacc-temp") #,"dacc-spring") 
 #dataset <<- get.list.of.datasets(DATA)
 VERBOSE <- TRUE
@@ -35,7 +35,7 @@ period <- c(1)#,2,3,4)#,5) #TODO IN PRODUCTION
 porc_train = 0.68
 breaks <- c(-20,0,50) # caso Helada y no helada
 # rf: random forest, glm: logistic regression
-models <- c("bnReg","rpart","rf") #TODO IN PRODUCTION
+models <- c("rf","rpart","bnReg") #TODO IN PRODUCTION
 # variable cuyo valor cambia segun configuracion for
 samp = "none" 
 tuneParLen = 1 
@@ -138,9 +138,9 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
   set.seed(3456)
   
   # si no arranco de cero no considera la primera fila, por eso el cero
-  trainIndex <- createDataPartition(0:nrow(sensores), p = porc_train,list = FALSE, times = 1) 
-  training.set <- as.data.frame(sensores[ trainIndex,])
-  test.set  <- as.data.frame(sensores[-trainIndex,])
+  until <- round(nrow(sensores)*porc_train)
+  training.set = as.data.frame(sensores[1:until-1, ] )
+  test.set = as.data.frame(sensores[until:nrow(sensores), ])
   
   X <- training.set #[,-which(colnames(sensores) %in% pred_sensores)]
   #pred_sensores <- pred_sensores[1:2]

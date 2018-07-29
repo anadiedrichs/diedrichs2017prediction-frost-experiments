@@ -154,9 +154,9 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
   set.seed(3456)
   
   # si no arranco de cero no considera la primera fila, por eso el cero
-  trainIndex <- createDataPartition(0:nrow(sensores), p = porc_train,list = FALSE, times = 1) 
-  training.set <- as.data.frame(sensores[ trainIndex,])
-  test.set  <- as.data.frame(sensores[-trainIndex,])
+  until <- round(nrow(sensores)*porc_train)
+  training.set = as.data.frame(sensores[1:until-1, ] )
+  test.set = as.data.frame(sensores[until:nrow(sensores), ])
   
   #X <- training.set[,-which(colnames(sensores) %in% pred_sensores)]
   X <- training.set
