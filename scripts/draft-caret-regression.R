@@ -9,17 +9,17 @@ source("bnlearn-utils.R")
 source("dataset-processing.R")
 
 # si quiero que los experimentos se ejecuten paralelamente en clusters o secuencialmente (porque estoy en debug o rstudio)
-PAR <- FALSE
-#dataset <- c("dacc")#,"dacc","dacc-temp") #,"dacc-spring") 
+PAR <- TRUE
+#dataset <- c("dacc","dacc-temp","dacc-spring") 
 #dataset <<- get.list.of.datasets(DATA)
 VERBOSE <- TRUE
 TMIN_CHAAR <-NULL
 DATA <- "dacc" # possible values: dacc, inta, ur, needed for dataset-processing.R
 if(DATA=="inta"){TMIN_CHAAR <-TRUE}else{TMIN_CHAAR <-FALSE}
 OUTPUT.FILE <- "output-reg-" # <- where prints go while cluster is running
-FILE.RESULT.NAME <- "--experimento-dacc-regression.csv"
-PATH.MODELS <- "./models-reg/"
-PATH.RESULTS <- "./results-reg/"
+FILE.RESULT.NAME <- "--experimento-dacc-regression-2.csv"
+PATH.MODELS <- "./models-reg-2/"
+PATH.RESULTS <- "./results-reg-2/"
 
 packages <- c("randomForest","caret","DMwR","readr","xts","timeDate","rpart")
 
@@ -29,7 +29,7 @@ SAVE_MODEL <- TRUE
 config.train <-c("normal")#,"smote")
 config.vars <-c("local","all") #only local variables or all variables.
 #' T cuantos dias anteriores tomamos
-period <- c(1)#,2,3,4)#,5) #TODO IN PRODUCTION
+period <- c(1,2,3,4)#,5) #TODO IN PRODUCTION
 #tunegrid <- expand.grid(.mtry=c(10:25),.ntree=seq(from=500,to=2500,by=500))
 # porcentaje para train set split
 porc_train = 0.68
@@ -146,7 +146,7 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
   #pred_sensores <- pred_sensores[1:2]
   
   #foreach(p = 1:length(pred_sensores),.packages = packages) %dopar% # 
-   for(p in 1:length(pred_sensores)) 
+   for(p in 2:length(pred_sensores)) 
   {
     
     Y <- as.numeric(training.set[,pred_sensores[p]])
@@ -251,23 +251,23 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
             Log(row)
             
             # agregar modelo a una lista 
-            lista[[file.name]] <- model
-            
+            #lista[[file.name]] <- model
+             warnings()
           }# for each model
           
         }# for por T
       }# for each config.vars
     }# for each config.train
     # plot y results de resample de los modelos 
-    resamps <- resamples(lista)
-    write.csv(resamps$values,file=paste(PATH.RESULTS,dataset[j],"--",pred_sensores[p],"--resamples.csv",sep=""))
-    png(paste(PATH.RESULTS,dataset[j],"--",pred_sensores[p],"--bwplot.png",sep=""))
-    print(bwplot(resamps))
-    dev.off()
-    png(paste(PATH.RESULTS,dataset[j],"--",pred_sensores[p],"--dotplot.png",sep=""))
-    print(dotplot(resamps))
-    dev.off()
-    lista <- list()
+#    resamps <- resamples(lista)
+#    write.csv(resamps$values,file=paste(PATH.RESULTS,dataset[j],"--",pred_sensores[p],"--resamples.csv",sep=""))
+#    png(paste(PATH.RESULTS,dataset[j],"--",pred_sensores[p],"--bwplot.png",sep=""))
+#    print(bwplot(resamps))
+#    dev.off()
+#    png(paste(PATH.RESULTS,dataset[j],"--",pred_sensores[p],"--dotplot.png",sep=""))
+#    print(dotplot(resamps))
+#    dev.off()
+#    lista <- list()
   }# for por cada sensor o estacion a predecir helada/no helada
 }# for dataset
 
