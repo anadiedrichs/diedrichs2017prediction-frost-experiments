@@ -42,7 +42,7 @@ tuneParLen = 1
 
 SEED <- 147
 seeds <- NULL
-KFOLD <- 3 #TODO IN PRODUCTION
+KFOLD <- 3750 #TODO IN PRODUCTION
 lista <- list()
 ################
 # from http://jaehyeon-kim.github.io/2015/05/Setup-Random-Seeds-on-Caret-Package.html
@@ -198,7 +198,7 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
             Log("Model ",mod)
             seeds <- settingMySeeds(mod,tuneParLen)
             #timeSlicesTrain <- createTimeSlices(1:nrow(training.set),initialWindow = T,horizon = 1,fixedWindow = TRUE)
-            my.train.control <- trainControl(method = "cv", number = KFOLD, 
+            my.train.control <- trainControl(method = "timeslice",# number = KFOLD, 
                                              initialWindow = t, horizon = 1, fixedWindow = TRUE,
                                              seeds = seeds)
             
