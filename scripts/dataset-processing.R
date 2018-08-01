@@ -202,7 +202,11 @@ dacc.temp <- function()
 }
 
 #' slide window method
-# tested
+#' tested
+#' T_value: integer > 0 
+#' sensores: data.frame with dataset
+#' pred_sensores: columns which are predictors and we want to keep in t.
+#' 
 desfasar.dataset.T <- function(T_value,sensores, pred_sensores){
   
   #' Procedemos a armar un dataset con las variables, colocando los datos de hace dos días, 
