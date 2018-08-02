@@ -9,17 +9,17 @@ source("bnlearn-utils.R")
 source("dataset-processing.R")
 
 # si quiero que los experimentos se ejecuten paralelamente en clusters o secuencialmente (porque estoy en debug o rstudio)
-PAR <- TRUE
+PAR <- FALSE
 #dataset <- c("dacc","dacc-temp","dacc-spring") 
 #dataset <<- get.list.of.datasets(DATA)
 VERBOSE <- TRUE
 TMIN_CHAAR <-NULL
 DATA <- "dacc" # possible values: dacc, inta, ur, needed for dataset-processing.R
 if(DATA=="inta"){TMIN_CHAAR <-TRUE}else{TMIN_CHAAR <-FALSE}
-OUTPUT.FILE <- "output-reg-" # <- where prints go while cluster is running
-FILE.RESULT.NAME <- "--experimento-dacc-regression-2.csv"
-PATH.MODELS <- "./models-reg-2/"
-PATH.RESULTS <- "./results-reg-2/"
+OUTPUT.FILE <- "output-reg-3-" # <- where prints go while cluster is running
+FILE.RESULT.NAME <- "--experimento-dacc-regression-3.csv"
+PATH.MODELS <- "./models-reg/"
+PATH.RESULTS <- "./results-reg/"
 
 packages <- c("randomForest","caret","DMwR","readr","xts","timeDate","rpart")
 
@@ -76,7 +76,7 @@ settingMySeeds <- function(model,tunelen) #TODO
 
 
 #' function to call each model through caret
-train.models <- function(trCtrl, X, Y,data, modelName,tp, predVar)
+train.models <- function(trCtrl, X, Y,data, modelName,tuneLen)
 {
   my.metric = "RMSE"
   model = NULL
@@ -85,22 +85,24 @@ train.models <- function(trCtrl, X, Y,data, modelName,tp, predVar)
   {
     # rf tune grid
     set.seed(SEED)
-    model <- train(x=X,y=Y,method="rf",trControl = trCtrl, metric=my.metric,importance=T, tuneLength=tp)
+    model <- train(x=X,y=Y,method="rf",trControl = trCtrl, metric=my.metric,importance=T, tuneLength=tuneLen)
     
   }else if(modelName == "rpart")
   {
     set.seed(SEED)
-    model <- train(y.disc ~., data = data, method = modelName, trControl=trCtrl,tuneLength = 10, #TODO tuneLenRpart
+    model <- train(Y ~., data = data, method = modelName, trControl=trCtrl,tuneLength = tuneLen, #TODO tuneLenRpart
                    metric=my.metric, parms=list(split='information'))
      
   }else if(modelName == "bnReg")
   {
     set.seed(SEED)
     # por defecto entrena en modo grilla o grid
+    Y <- cbind(Y)
+    colnames(Y) <- "Y"
     model <- train(x= X, y = Y, data = data, 
                       method = bnReg, metric=my.metric,
                       trControl = trCtrl, 
-                      node = predVar) 
+                      node = "Y") 
   }
   model     
   
@@ -135,25 +137,11 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
   pred_sensores <- dd$pred
   Log("DATASET ",dd$name)
   
-  set.seed(3456)
   
-  # si no arranco de cero no considera la primera fila, por eso el cero
-  until <- round(nrow(sensores)*porc_train)
-  training.set = as.data.frame(sensores[1:until-1, ] )
-  test.set = as.data.frame(sensores[until:nrow(sensores), ])
-  
-  X <- training.set #[,-which(colnames(sensores) %in% pred_sensores)]
-  #pred_sensores <- pred_sensores[1:2]
   
   #foreach(p = 1:length(pred_sensores),.packages = packages) %dopar% # 
    for(p in 2:length(pred_sensores)) 
   {
-    
-    Y <- as.numeric(training.set[,pred_sensores[p]])
-    #' discretizar valores en helada y no helada, con nombres admisibles como make.names
-    real <- test.set[,pred_sensores[p]]
-    
-    y.disc <- as.vector(Y)
     
     Log(pred_sensores[p])
    
@@ -170,24 +158,17 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
       {
         Log("config.vars ",config.vars[cvars])
         
-        if(config.vars[cvars]=="local")
-        {
-          vars <- vars.del.sensor(pred_sensores[p],colnames(X))
-          X <- X[,vars]
-          data <- cbind(X,y.disc)
-          tuneParLen = 1 
-          
-        }else{
-          
-          X <- training.set #[,-which(colnames(sensores) %in% pred_sensores)]
-          data <- cbind(X,y.disc)
-          tuneParLen = 5
-        }
-        
         #foreach(t = 1:length(period),.packages = packages) %dopar% 
         for(t in period)
         {
           Log("T value ",t)
+          
+          aux <- build.dataset.for.experiment(t=period[t],dataset=sensores, pred_sensores, pred_sensores[p],config=config.vars[cvars])
+          
+          X <- aux$x
+          Y <- aux$y
+          data <- aux$data
+          test.set <- aux$test
           
           #fila_header <- paste(dd$name,pred_sensores[p],config.train[ct],config.vars[cvars],t,sep = ",")
           fila_header <- cbind(dd$name,pred_sensores[p],config.train[ct],config.vars[cvars],t)
@@ -196,21 +177,26 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
           for(mod in models)
           {
             Log("Model ",mod)
-            seeds <- settingMySeeds(mod,tuneParLen)
+            cc <- createTimeSlices(1:nrow(training.set),initialWindow=300,horizon=100,fixedWindow=FALSE)
+            KFOLDS <- length(cc$train)
+            if(ncol(X)<10) tunePar = 3
+            else tunePar = 10
+            
+            seeds <- settingMySeeds(mod,tunePar)
             #timeSlicesTrain <- createTimeSlices(1:nrow(training.set),initialWindow = T,horizon = 1,fixedWindow = TRUE)
-            my.train.control <- trainControl(method = "timeslice",# number = KFOLD, 
-                                             initialWindow = t, horizon = 1, fixedWindow = TRUE,
+            my.train.control <- trainControl(method = "timeslice",# number = KFOLD,
+                                             initialWindow = 300, horizon = 100, fixedWindow = TRUE,
                                              seeds = seeds)
-            
-            
+
+
             start_time <- Sys.time()
-            model <- train.models(trCtrl=my.train.control, X=X, Y=y.disc,data=data, modelName=mod, tp = tuneParLen,predVar=pred_sensores[p])
+            model <- train.models(trCtrl=my.train.control, X=X, Y=Y,data=data, modelName=mod, tuneLen=tunePar)
             end_time <- Sys.time()
             runtime <- round(as.numeric(difftime(end_time, start_time, units = "secs")),3)
-            
+
             fila <- cbind(fila_header,mod,runtime)
             file.name <- paste(name_header,mod,sep = "--")
-            
+
             # save model
             if(SAVE_MODEL){save(model, file = paste(PATH.MODELS,file.name,".RData",sep=""),compress = TRUE)}
             if(VERBOSE){
@@ -221,15 +207,15 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
             if(mod == "bnReg")
             {
               #save Markov blanket
-              bnregmb <- mb(model$finalModel$network,node=pred_sensores[p])
+              bnregmb <- mb(model$finalModel$network,node="Y")
               df.bnregmb <- data.frame(nodes=bnregmb)
               write.csv(x = df.bnregmb,file = paste(PATH.RESULTS,file.name,"--markovBlanket.csv",sep = ""))
               # plot Bayesian network
               png(paste(PATH.RESULTS,file.name,"--BayesianNetwork.png",sep = ""))
               print(plot(model$finalModel$network))
               dev.off()
-              
-            }else{ #variable importance list 
+
+            }else{ #variable importance list
               vv <- varImp(model) # si tiene varImpModel
               write.csv(x = as.data.frame(vv$importance),file = paste(PATH.RESULTS,file.name,"--importance.csv",sep = ""))
               png(paste(PATH.RESULTS,file.name,"--importance.png",sep = ""))
@@ -238,23 +224,23 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
             }
             # prediction on test.set
             pred <- predict(model,test.set)
-            
+
             # guardar csv con valor real vs predicho
-            dat <- as.data.frame(cbind(real,pred))
+            dat <- as.data.frame(cbind(aux$real,pred))
             colnames(dat)<- c("y_real","y_pred")
             write.csv(x = dat,file = paste(PATH.RESULTS,file.name,"--Y-vs-Y_pred.csv",sep = ""))
             # evaluar en testeo
             eee <- evaluate(pred, real)
             # guardo detalles del experimento
-            row <- cbind(fila,eee$MAE,eee$rmse,eee$r2,t(eee$cm$overall),t(eee$cm$byClass)) 
+            row <- cbind(fila,eee$MAE,eee$rmse,eee$r2,t(eee$cm$overall),t(eee$cm$byClass))
             write.table(row, file=RESUMEN, append = TRUE,row.names = FALSE,col.names = FALSE, sep = ",")
             Log(row)
-            
-            # agregar modelo a una lista 
+
+            # agregar modelo a una lista
             #lista[[file.name]] <- model
              warnings()
           }# for each model
-          
+
         }# for por T
       }# for each config.vars
     }# for each config.train
