@@ -227,7 +227,7 @@ build.dataset.for.experiment <- function(t, dataset, predictores, predVariable, 
   real <- test.set[,predVar]
   #y.disc <- as.vector(Y)
   
-  if(config.vars[cvars]=="local")
+  if(config=="local")
   { # dejar solo las variables propias de la estacion
     
     vars <- vars.del.sensor(pred_sensores[p],colnames(training.set))
