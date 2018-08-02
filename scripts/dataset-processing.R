@@ -201,6 +201,48 @@ dacc.temp <- function()
   return(list(data = data, pred = d$pred, name="dacc-temp"))
 }
 
+#' 
+#' t: integer value > 0
+#' dataset: data.frame type
+#' predictores: variables which could be predictors
+#' predVariable: variable name (string) which I would like to predict
+#' config: values "local" or "normal"
+build.dataset.for.experiment <- function(t, dataset, predictores, predVariable, porc_train=0.68, config="local")
+{
+  #' Obtengo dataset con variables desfasadas a t dias 
+  aux <- desfasar.dataset.T(t,dataset, predictores)
+  predictors <- aux$vars
+  df <- aux$data
+  
+  #' ### Training set y test dataset
+  df[,1:ncol(df)] <- lapply(df[,1:ncol(df)],as.numeric) # <- convertir a numeric
+  until <- round(nrow(df)*porc_train)
+  training.set = df[1:until-1, ] # This is training set to learn the parameters
+  test.set = df[until:nrow(df), ]
+  
+  #' predictor
+  predVar <- predictors[grep(predVariable,predictors)]
+  Y <- as.numeric(training.set[,predVar])
+  #' discretizar valores en helada y no helada, con nombres admisibles como make.names
+  real <- test.set[,predVar]
+  #y.disc <- as.vector(Y)
+  
+  if(config.vars[cvars]=="local")
+  { # dejar solo las variables propias de la estacion
+    
+    vars <- vars.del.sensor(pred_sensores[p],colnames(training.set))
+    X <- training.set[,vars] 
+    X <- X[,-grep(predVar,colnames(X))] # evitar repetir predictor
+    data <- cbind(X,Y)
+
+  }else{# quitar variables en *_t, menos la del predictor
+    
+    X <- training.set[,-which(colnames(training.set) %in% predictors)]
+    data <- cbind(training.set,Y) # agrego variable del predictor 
+  }
+  
+  return(list(data=data,x=X,y=Y, train=training.set,test=test.set, real=real))
+}
 #' slide window method
 #' tested
 #' T_value: integer > 0 
