@@ -145,21 +145,21 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
     
     Log(pred_sensores[p])
    
-   foreach(c = 1:length(config.train),.packages = packages) %dopar%  # 
-  #for(ct in 1:length(config.train))
+  # foreach(c = 1:length(config.train),.packages = packages) %dopar%  # 
+  for(ct in 1:length(config.train))
     {
       Log("config.train ",config.train[ct])
       
       if(config.train[ct] == "smote"){samp = smotest}
       else {samp = NULL}
       
-      foreach(cvars = 1:length(config.vars),.packages = packages) %dopar%  # 
-      #for(cvars in 1:length(config.vars))
+      #foreach(cvars = 1:length(config.vars),.packages = packages) %dopar%  # 
+      for(cvars in 1:length(config.vars))
       {
         Log("config.vars ",config.vars[cvars])
         
-        foreach(t = 1:length(period),.packages = packages) %dopar% 
-        #for(t in period)
+        #foreach(t = 1:length(period),.packages = packages) %dopar% 
+        for(t in period)
         {
           Log("T value ",t)
           
@@ -173,8 +173,8 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
           #fila_header <- paste(dd$name,pred_sensores[p],config.train[ct],config.vars[cvars],t,sep = ",")
           fila_header <- cbind(dd$name,pred_sensores[p],config.train[ct],config.vars[cvars],t)
           name_header <- paste(dd$name,pred_sensores[p],config.train[ct],config.vars[cvars],t,sep = "--")
-         foreach(m = 1:length(models),.packages = packages) %dopar% 
-         # for(mod in models)
+         #foreach(m = 1:length(models),.packages = packages) %dopar% 
+          for(mod in models)
           {
             Log("Model ",mod)
             cc <- createTimeSlices(1:nrow(X),initialWindow=300,horizon=100,fixedWindow=FALSE)
