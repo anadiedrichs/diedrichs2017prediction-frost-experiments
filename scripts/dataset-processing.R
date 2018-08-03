@@ -144,6 +144,186 @@ dacc.temp_v2 <- function()
   return(list(data = data, pred = d$pred, name="dacc-temp"))
 }
 
+#' 
+#' t: integer value > 0
+#' dataset: data.frame type
+#' predictores: variables which could be predictors
+#' predVariable: variable name (string) which I would like to predict
+#' config: values "local" or "normal"
+build.dataset.for.experiment <- function(t, dataset, predictores, predVariable, porc_train=0.68, config="local")
+{
+  #' Obtengo dataset con variables desfasadas a t dias 
+  aux <- desfasar.dataset.T(t,dataset, predictores)
+  predictors <- aux$vars
+  df <- aux$data
+  
+  #' ### Training set y test dataset
+  df[,1:ncol(df)] <- lapply(df[,1:ncol(df)],as.numeric) # <- convertir a numeric
+  until <- round(nrow(df)*porc_train)
+  training.set = df[1:until-1, ] # This is training set to learn the parameters
+  test.set = df[until:nrow(df), ]
+  
+  #' predictor
+  predVar <- predictors[grep(predVariable,predictors)]
+  Y <- as.numeric(training.set[,predVar])
+  #' discretizar valores en helada y no helada, con nombres admisibles como make.names
+  real <- test.set[,predVar]
+  #y.disc <- as.vector(Y)
+  
+  if(config=="local")
+  { # dejar solo las variables propias de la estacion
+    
+    vars <- vars.del.sensor(pred_sensores[p],colnames(training.set))
+    X <- training.set[,vars] 
+    X <- X[,-grep(predVar,colnames(X))] # evitar repetir predictor
+    data <- cbind(X,Y)
+
+  }else{# quitar variables en *_t, menos la del predictor
+    
+    X <- training.set[,-which(colnames(training.set) %in% predictors)]
+    data <- cbind(training.set,Y) # agrego variable del predictor 
+  }
+  
+  return(list(data=data,x=X,y=Y, train=training.set,test=test.set, real=real))
+}
+
+build.dataset.classification <- function(t, dataset, predictores, predVariable, porc_train=0.68, config="local",breaks = NULL)
+{
+  if(is.null(breaks)) stop("breaks shouldn't be null")
+  
+  #' Obtengo dataset con variables desfasadas a t dias 
+  aux <- desfasar.dataset.T(t,dataset, predictores)
+  predictors <- aux$vars
+  df <- aux$data
+  
+  #' ### Training set y test dataset
+  df[,1:ncol(df)] <- lapply(df[,1:ncol(df)],as.numeric) # <- convertir a numeric
+  until <- round(nrow(df)*porc_train)
+  training.set = df[1:until-1, ] # This is training set to learn the parameters
+  test.set = df[until:nrow(df), ]
+  
+  #' predictor
+  predVar <- predictors[grep(predVariable,predictors)]
+  Y <- as.numeric(training.set[,predVar])
+  
+  #' discretizar valores (helada y no helad)a, con nombres admisibles como make.names
+  real <- test.set[,predVar]
+  real[which(real <=0)] <- "frost" # frost
+  real[which(real !="frost")] <- "notfrost" # NO frost
+  real <- as.factor(real)
+  
+  Y[which(Y <=0)] <- "frost"
+  Y[which(Y !="frost")] <- "notfrost"
+  Y <- as.vector(as.factor(Y))
+  
+  if(config=="local")
+  { # dejar solo las variables propias de la estacion
+    
+    vars <- vars.del.sensor(pred_sensores[p],colnames(training.set))
+    X <- training.set[,vars] 
+    X <- X[,-grep(predVar,colnames(X))] # evitar repetir predictor
+    data <- cbind(X,Y)
+    
+  }else{# quitar variables en *_t, menos la del predictor
+    
+    X <- training.set[,-which(colnames(training.set) %in% predictors)]
+    data <- cbind(training.set,Y) # agrego variable del predictor 
+  }
+  
+  return(list(data=data,x=X,y=Y, train=training.set,test=test.set, real=real))
+}
+#' slide window method
+#' tested
+#' T_value: integer > 0 
+#' sensores: data.frame with dataset
+#' pred_sensores: columns which are predictors and we want to keep in t.
+#' 
+desfasar.dataset.T <- function(T_value,sensores, pred_sensores){
+  
+  #' Procedemos a armar un dataset con las variables, colocando los datos de hace dos días, 
+  #'  luego hace un día y luego día presente. Por ello, desfazamos el dataset para que 
+  #'  queden primero las variables en T-2, T-1 y luego en t o tiempo presente, si T=2.
+  #'  
+  
+  df <- NULL
+  fin <- T_value
+  
+  for(t in 1:T_value)
+  {
+    aux <- sensores[t:(nrow(sensores)-fin),] 
+    colnames(aux) <- paste(colnames(aux),"_T_",fin,sep="")
+    if(is.null(df)){df <- aux}
+    else df <- cbind.data.frame(df,aux)
+    fin <- fin - 1
+    
+  }
+  
+  #' del tiempo presente solo me interesa la temperatura mínima, las que quiero predecir
+  sensores_t <- sensores[(T_value+1):(nrow(sensores)),pred_sensores] 
+  
+  #sensores_t <- sensores_t[,pred_sensores]
+  colnames(sensores_t) <- paste(colnames(sensores_t),"_t",sep="")
+  pred_sensores <- paste(pred_sensores,"_t",sep="") # renombro variables predictoras
+  
+  #' creo dataset de datos de T-2, T-1 y t, caso T=2
+  df <- cbind.data.frame(df,sensores_t)
+  
+  return(list(data=df,vars=pred_sensores))
+}
+
+
+############################DEPRECATED ZONE ###################3
+# deprecated, usar desfasar.dataset.T
+desfasar.dataset.t2 <- function(sensores, pred_sensores){
+  
+  #' Procedemos a armar un dataset con las variables, colocando los datos de hace dos días, 
+  #'  luego hace un día y luego día presente. Por ello, desfazamos el dataset para que 
+  #'  queden primero las variables en T-2, T-1 y luego en t o tiempo presente.
+  
+  sensores_T_2 <- sensores[1:(nrow(sensores)-2),] 
+  sensores_T_1 <- sensores[2:(nrow(sensores)-1),] # no incluyo la primera fila
+  sensores_t <- sensores[3:nrow(sensores),] 
+  
+  #' renombro las columnas 
+  colnames(sensores_T_2) <- paste(colnames(sensores_T_2),"_T_2",sep="")
+  colnames(sensores_T_1) <- paste(colnames(sensores_T_1),"_T_1",sep="")
+  
+  #' del tiempo presente solo me interesa la temperatura mínima, las que quiero predecir
+  sensores_t <- sensores_t[,pred_sensores]
+  colnames(sensores_t) <- paste(colnames(sensores_t),"_t",sep="")
+  pred_sensores <- paste(pred_sensores,"_t",sep="") # renombro variables predictoras
+  
+  #' creo dataset de datos de T-2, T-1 y t
+  df <- cbind.data.frame(sensores_T_2,sensores_T_1,sensores_t)
+  
+  
+  return(list(data=df,vars=pred_sensores))
+}
+
+# deprecated, usar desfasar.dataset.T
+desfasar.dataset.t1 <- function(sensores, pred_sensores){
+  
+  #' Procedemos a armar un dataset con las variables, colocando los datos de hace dos días, 
+  #'  luego hace un día y luego día presente. Por ello, desfazamos el dataset para que 
+  #'  queden primero las variables en T-2, T-1 y luego en t o tiempo presente.
+  
+  sensores_T_1 <- sensores[1:(nrow(sensores)-1),] 
+  sensores_t <- sensores[2:nrow(sensores),] # no incluyo la primera fila
+  
+  #' renombro las columnas 
+  colnames(sensores_T_1) <- paste(colnames(sensores_T_1),"_T_1",sep="")
+  
+  #' del tiempo presente solo me interesa la temperatura mínima, las que quiero predecir
+  sensores_t <- sensores_t[,pred_sensores]
+  colnames(sensores_t) <- paste(colnames(sensores_t),"_t",sep="")
+  pred_sensores <- paste(pred_sensores,"_t",sep="") # renombro variables predictoras
+  
+  #' creo dataset de datos de T-2, T-1 y t
+  df <- cbind.data.frame(sensores_T_1,sensores_t)
+  
+  return(list(data=df,vars=pred_sensores))
+}
+
 # probado
 # deprecated at 30 oct 2017
 dacc <- function()
@@ -199,136 +379,4 @@ dacc.temp <- function()
   data <- data[,-which(names(data) %in% h)]
   
   return(list(data = data, pred = d$pred, name="dacc-temp"))
-}
-
-#' 
-#' t: integer value > 0
-#' dataset: data.frame type
-#' predictores: variables which could be predictors
-#' predVariable: variable name (string) which I would like to predict
-#' config: values "local" or "normal"
-build.dataset.for.experiment <- function(t, dataset, predictores, predVariable, porc_train=0.68, config="local")
-{
-  #' Obtengo dataset con variables desfasadas a t dias 
-  aux <- desfasar.dataset.T(t,dataset, predictores)
-  predictors <- aux$vars
-  df <- aux$data
-  
-  #' ### Training set y test dataset
-  df[,1:ncol(df)] <- lapply(df[,1:ncol(df)],as.numeric) # <- convertir a numeric
-  until <- round(nrow(df)*porc_train)
-  training.set = df[1:until-1, ] # This is training set to learn the parameters
-  test.set = df[until:nrow(df), ]
-  
-  #' predictor
-  predVar <- predictors[grep(predVariable,predictors)]
-  Y <- as.numeric(training.set[,predVar])
-  #' discretizar valores en helada y no helada, con nombres admisibles como make.names
-  real <- test.set[,predVar]
-  #y.disc <- as.vector(Y)
-  
-  if(config=="local")
-  { # dejar solo las variables propias de la estacion
-    
-    vars <- vars.del.sensor(pred_sensores[p],colnames(training.set))
-    X <- training.set[,vars] 
-    X <- X[,-grep(predVar,colnames(X))] # evitar repetir predictor
-    data <- cbind(X,Y)
-
-  }else{# quitar variables en *_t, menos la del predictor
-    
-    X <- training.set[,-which(colnames(training.set) %in% predictors)]
-    data <- cbind(training.set,Y) # agrego variable del predictor 
-  }
-  
-  return(list(data=data,x=X,y=Y, train=training.set,test=test.set, real=real))
-}
-#' slide window method
-#' tested
-#' T_value: integer > 0 
-#' sensores: data.frame with dataset
-#' pred_sensores: columns which are predictors and we want to keep in t.
-#' 
-desfasar.dataset.T <- function(T_value,sensores, pred_sensores){
-  
-  #' Procedemos a armar un dataset con las variables, colocando los datos de hace dos días, 
-  #'  luego hace un día y luego día presente. Por ello, desfazamos el dataset para que 
-  #'  queden primero las variables en T-2, T-1 y luego en t o tiempo presente, si T=2.
-  #'  
-  
-  df <- NULL
-  fin <- T_value
-  
-  for(t in 1:T_value)
-  {
-    aux <- sensores[t:(nrow(sensores)-fin),] 
-    colnames(aux) <- paste(colnames(aux),"_T_",fin,sep="")
-    if(is.null(df)){df <- aux}
-    else df <- cbind.data.frame(df,aux)
-    fin <- fin - 1
-    
-  }
-  
-  #' del tiempo presente solo me interesa la temperatura mínima, las que quiero predecir
-  sensores_t <- sensores[(T_value+1):(nrow(sensores)),pred_sensores] 
-  
-  #sensores_t <- sensores_t[,pred_sensores]
-  colnames(sensores_t) <- paste(colnames(sensores_t),"_t",sep="")
-  pred_sensores <- paste(pred_sensores,"_t",sep="") # renombro variables predictoras
-  
-  #' creo dataset de datos de T-2, T-1 y t, caso T=2
-  df <- cbind.data.frame(df,sensores_t)
-  
-  return(list(data=df,vars=pred_sensores))
-}
-
-# deprecated, usar desfasar.dataset.T
-desfasar.dataset.t2 <- function(sensores, pred_sensores){
-  
-  #' Procedemos a armar un dataset con las variables, colocando los datos de hace dos días, 
-  #'  luego hace un día y luego día presente. Por ello, desfazamos el dataset para que 
-  #'  queden primero las variables en T-2, T-1 y luego en t o tiempo presente.
-  
-  sensores_T_2 <- sensores[1:(nrow(sensores)-2),] 
-  sensores_T_1 <- sensores[2:(nrow(sensores)-1),] # no incluyo la primera fila
-  sensores_t <- sensores[3:nrow(sensores),] 
-  
-  #' renombro las columnas 
-  colnames(sensores_T_2) <- paste(colnames(sensores_T_2),"_T_2",sep="")
-  colnames(sensores_T_1) <- paste(colnames(sensores_T_1),"_T_1",sep="")
-  
-  #' del tiempo presente solo me interesa la temperatura mínima, las que quiero predecir
-  sensores_t <- sensores_t[,pred_sensores]
-  colnames(sensores_t) <- paste(colnames(sensores_t),"_t",sep="")
-  pred_sensores <- paste(pred_sensores,"_t",sep="") # renombro variables predictoras
-  
-  #' creo dataset de datos de T-2, T-1 y t
-  df <- cbind.data.frame(sensores_T_2,sensores_T_1,sensores_t)
-  
-  
-  return(list(data=df,vars=pred_sensores))
-}
-
-# deprecated, usar desfasar.dataset.T
-desfasar.dataset.t1 <- function(sensores, pred_sensores){
-  
-  #' Procedemos a armar un dataset con las variables, colocando los datos de hace dos días, 
-  #'  luego hace un día y luego día presente. Por ello, desfazamos el dataset para que 
-  #'  queden primero las variables en T-2, T-1 y luego en t o tiempo presente.
-  
-  sensores_T_1 <- sensores[1:(nrow(sensores)-1),] 
-  sensores_t <- sensores[2:nrow(sensores),] # no incluyo la primera fila
-  
-  #' renombro las columnas 
-  colnames(sensores_T_1) <- paste(colnames(sensores_T_1),"_T_1",sep="")
-  
-  #' del tiempo presente solo me interesa la temperatura mínima, las que quiero predecir
-  sensores_t <- sensores_t[,pred_sensores]
-  colnames(sensores_t) <- paste(colnames(sensores_t),"_t",sep="")
-  pred_sensores <- paste(pred_sensores,"_t",sep="") # renombro variables predictoras
-  
-  #' creo dataset de datos de T-2, T-1 y t
-  df <- cbind.data.frame(sensores_T_1,sensores_t)
-  
-  return(list(data=df,vars=pred_sensores))
 }
