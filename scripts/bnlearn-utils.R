@@ -56,12 +56,6 @@ get_whitelist <- function(pred_sensores,variables,dataset_tmin_chaar = FALSE){
   return(wl)
 }
 
-#Logger function
-Log <- function(text, ...) {
-  msg <- sprintf(paste0(as.character(Sys.time()), ": ", text,..., "\n"))
-  cat(msg)
-}
-
 #' As trainingNormal. The difference: after fitting the predict function is apply only to one "var"
 trainingNormalOneVar <- function(df,alg,sc, file.name, var, fila,p=split.train)
 {
