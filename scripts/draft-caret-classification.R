@@ -24,16 +24,16 @@ SAVE_MODEL <- TRUE
 # si quiero que los experimentos se ejecuten paralelamente en clusters o secuencialmente (porque estoy en debug o rstudio)
 PAR <- FALSE
 #normal: just split train and test set, smote: oversampling of the minority class.
-config.train <-c("normal","smote")
+config.train <-c("smote","normal")
 config.vars <-c("local","all") #only local variables or all variables.
 #' T cuantos dias anteriores tomamos
-period <- c(1,2,3,4)#,5)
+period <- c(1,2)#,3,4)#,5)
 #tunegrid <- expand.grid(.mtry=c(10:25),.ntree=seq(from=500,to=2500,by=500))
 # porcentaje para train set split
 porc_train = 0.68
 breaks <- c(-20,0,50) # caso Helada y no helada
 # rf: random forest, glm: logistic regression
-models <- c("C5.0","rf","glm","rpart")
+models <- c("glm","C5.0","rf","rpart")
 # variable cuyo valor cambia segun configuracion for
 samp = "none" 
 tuneParLen = 1 
@@ -73,18 +73,18 @@ train.models <- function(trCtrl, X, Y,data, modelName,tp)
   {
     
     set.seed(SEED)
-    model <- train(y.disc ~ ., data = data, method="glm", family="binomial",trControl = trCtrl, metric="ROC")
+    model <- train(Y ~ ., data = data, method="glm", family="binomial",trControl = trCtrl, metric="ROC")
     
   } else if(modelName == "C5.0")
   {
     
-    model<- train(x=X,y=Y,tuneGrid=gridC50,trControl=trCtrl,method="C5.0",metric="ROC",verbose=FALSE)
+    model<- train(x=X,y=Y,trControl=trCtrl,method="C5.0",metric="ROC",tuneLength=tp,verbose=FALSE) #tuneGrid=gridC50,
     
   }else if(modelName == "rpart")
   {
     
     set.seed(SEED)
-    model <- train(y.disc ~., data = data, method = "rpart", trControl=trCtrl,tuneLength = 10,
+    model <- train(Y ~., data = data, method = "rpart", trControl=trCtrl,tuneLength = tp,
                    metric="ROC", parms=list(split='information'))
     
   } 
@@ -132,31 +132,11 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
   pred_sensores <- dd$pred
   Log("DATASET ",dd$name)
   
-  set.seed(3456)
-  
-  # si no arranco de cero no considera la primera fila, por eso el cero
-  until <- round(nrow(sensores)*porc_train)
-  training.set = as.data.frame(sensores[1:until-1, ] )
-  test.set = as.data.frame(sensores[until:nrow(sensores), ])
-  
-  #X <- training.set[,-which(colnames(sensores) %in% pred_sensores)]
-  X <- training.set
-  #pred_sensores <- pred_sensores[1:2]
   
   #foreach(p = 1:length(pred_sensores),.packages = packages) %dopar% # 
    for(p in 1:length(pred_sensores)) 
   {
     
-    Y <- as.numeric(training.set[,pred_sensores[p]])
-    #' discretizar valores en helada y no helada, con nombres admisibles como make.names
-    real <- test.set[,pred_sensores[p]]
-    real[which(real <=0)] <- "frost" # frost
-    real[which(real !="frost")] <- "notfrost" # NO frost
-    real <- as.factor(real)
-    y.disc <- as.vector(Y)
-    y.disc[which(y.disc <=0)] <- "frost"
-    y.disc[which(y.disc !="frost")] <- "notfrost"
-    y.disc <- as.factor(y.disc)
     Log(pred_sensores[p])
    
     # foreach(c = 1:length(config.train),.packages = packages) %dopar%  # 
@@ -172,25 +152,21 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
       {
         Log("config.vars ",config.vars[cvars])
 
-        
-        if(config.vars[cvars]=="local")
-        {
-          vars <- vars.del.sensor(pred_sensores[p],colnames(X))
-          X <- X[,vars]
-          data <- cbind(X,y.disc)
-          tuneParLen = 1 
-          
-        }else{
-          
-          X <- training.set #[,-which(colnames(sensores) %in% pred_sensores)]
-          data <- cbind(X,y.disc)
-          tuneParLen = 5
-        }
-        
         #foreach(t = 1:length(period),.packages = packages) %dopar% 
         for(t in 1:length(period))
         {
           Log("T value ",t)
+          
+          aux <- build.dataset.classification(t=period[t],
+                                              dataset=sensores, 
+                                              pred_sensores, 
+                                              pred_sensores[p],
+                                              config=config.vars[cvars], breaks= breaks)
+          
+          X <- aux$x
+          Y <- aux$y
+          data <- aux$data
+          test.set <- aux$test
           
           #fila_header <- paste(dd$name,pred_sensores[p],config.train[ct],config.vars[cvars],t,sep = ",")
           fila_header <- cbind(dd$name,pred_sensores[p],config.train[ct],config.vars[cvars],t)
@@ -199,17 +175,23 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
           
           for(mod in models)
           {
+            
+            cc <- createTimeSlices(1:nrow(X),initialWindow=1000,horizon=200,fixedWindow=FALSE)
+            KFOLDS <- length(cc$train)
+            if(ncol(X)<10) tunePar = 3
+            else tunePar = 10
+            
             seeds <- settingMySeeds(mod,tuneParLen)
             #timeSlicesTrain <- createTimeSlices(1:nrow(training.set),initialWindow = T,horizon = 1,fixedWindow = TRUE)
             my.train.control <- trainControl(method = "timeslice", #number = KFOLD, 
-                                             initialWindow = t, horizon = 1, fixedWindow = TRUE,
+                                             initialWindow = 1000, horizon = 200, fixedWindow = TRUE,
                                              sampling = samp
                                              ,classProbs = TRUE, summaryFunction = twoClassSummary,
                                              seeds = seeds)
             
             
             start_time <- Sys.time()
-            model <- train.models(trCtrl=my.train.control, X=X, Y=y.disc,data=data, modelName=mod, tp = tuneParLen)
+            model <- train.models(trCtrl=my.train.control, X=X, Y=Y,data=data, modelName=mod, tp = tunePar)
             end_time <- Sys.time()
             runtime <- round(as.numeric(difftime(end_time, start_time, units = "secs")),3)
             
@@ -239,7 +221,7 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
             colnames(dat)<- c("y_real","y_pred")
             write.csv(x = dat,file = paste(PATH.RESULTS,file.name,"--Y-vs-Y_pred.csv",sep = ""))
             # evaluar en testeo
-            eee <- evaluate.classification(pred, real)
+            eee <- evaluate.classification(pred, aux$real)
             # guardo detalles del experimento
             #row <- paste(fila,eee$sens,eee$acc,eee$prec,eee$spec,"param1","param2",sep=",")
             row <- cbind(fila,eee$far,t(eee$cm$overall),t(eee$cm$byClass),t(tcs))
