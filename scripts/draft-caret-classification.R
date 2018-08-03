@@ -1,7 +1,7 @@
 library(doParallel)
 library(randomForest)
 library(caret)
-
+source("reproducibility.R")
 source("metrics.R")
 source("dataset-processing.R")
 
@@ -44,24 +44,6 @@ lista <- list()
 gridC50 <- expand.grid( .winnow = c(TRUE,FALSE), .trials=c(1,5,10,15,20), .model="tree" )
 
 ################
-# from http://jaehyeon-kim.github.io/2015/05/Setup-Random-Seeds-on-Caret-Package.html
-setSeeds <- function(method = "cv", numbers = 1, repeats = 1, tunes = NULL, seed = 1237) {
-  #B is the number of resamples and integer vector of M (numbers + tune length if any)
-  B <- if (method == "cv") numbers
-  else if(method == "repeatedcv") numbers * repeats
-  else NULL
-  
-  if(is.null(length)) {
-    seeds <- NULL
-  } else {
-    set.seed(seed = seed)
-    seeds <- vector(mode = "list", length = B)
-    seeds <- lapply(seeds, function(x) sample.int(n = 1000000, size = numbers + ifelse(is.null(tunes), 0, tunes)))
-    seeds[[length(seeds) + 1]] <- sample.int(n = 1000000, size = 1)
-  }
-  # return seeds
-  seeds
-}
 
 settingMySeeds <- function(model,tunelen)
 { 

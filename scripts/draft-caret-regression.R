@@ -7,7 +7,7 @@ library(bnlearn)
 source("bnlearnRegression.R")
 source("metrics.R")
 source("dataset-processing.R")
-
+source("reproducibility.R")
 # si quiero que los experimentos se ejecuten paralelamente en clusters o secuencialmente (porque estoy en debug o rstudio)
 PAR <- FALSE
 #dataset <- c("dacc","dacc-temp","dacc-spring") 
@@ -45,24 +45,6 @@ seeds <- NULL
 KFOLD <- 3750 #TODO IN PRODUCTION
 lista <- list()
 ################
-# from http://jaehyeon-kim.github.io/2015/05/Setup-Random-Seeds-on-Caret-Package.html
-setSeeds <- function(method = "cv", numbers = 1, repeats = 1, tunes = NULL, seed = 1237) {
-  #B is the number of resamples and integer vector of M (numbers + tune length if any)
-  B <- if (method == "cv") numbers
-  else if(method == "repeatedcv") numbers * repeats
-  else NULL
-  
-  if(is.null(length)) {
-    seeds <- NULL
-  } else {
-    set.seed(seed = seed)
-    seeds <- vector(mode = "list", length = B)
-    seeds <- lapply(seeds, function(x) sample.int(n = 1000000, size = numbers + ifelse(is.null(tunes), 0, tunes)))
-    seeds[[length(seeds) + 1]] <- sample.int(n = 1000000, size = 1)
-  }
-  # return seeds
-  seeds
-}
 
 settingMySeeds <- function(model,tunelen) #TODO
 { 
