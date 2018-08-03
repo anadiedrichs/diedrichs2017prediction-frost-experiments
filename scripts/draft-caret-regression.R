@@ -35,7 +35,7 @@ period <- c(1)#,2,3,4)#,5) #TODO IN PRODUCTION
 porc_train = 0.68
 breaks <- c(-20,0,50) # caso Helada y no helada
 # rf: random forest, glm: logistic regression
-models <- c("bnReg","rf") #TODO IN PRODUCTION  "rpart",
+models <- c("rf")#"bnReg", #TODO IN PRODUCTION  "rpart",
 # variable cuyo valor cambia segun configuracion for
 samp = "none" 
 tuneParLen = 1 
@@ -44,6 +44,10 @@ SEED <- 147
 seeds <- NULL
 KFOLD <- 3750 #TODO IN PRODUCTION
 lista <- list()
+
+INITIAL.WINDOW <- 3000
+HORIZON <- 500
+
 ################
 
 settingMySeeds <- function(model,tunelen) #TODO
@@ -122,7 +126,7 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
   
   
  # foreach(p = 1:length(pred_sensores),.packages = packages) %dopar% # 
-   for(p in 1:length(pred_sensores[1])) #solo corro Junin 
+   for(p in 1:length(pred_sensores)) #solo corro Junin 
   {
     
     Log(pred_sensores[p])

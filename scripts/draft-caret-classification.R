@@ -33,7 +33,7 @@ period <- c(1,2)#,3,4)#,5)
 porc_train = 0.68
 breaks <- c(-20,0,50) # caso Helada y no helada
 # rf: random forest, glm: logistic regression
-models <- c("glm","C5.0","rf","rpart")
+models <- c("rpart","glm","rf") #"C5.0",
 # variable cuyo valor cambia segun configuracion for
 samp = "none" 
 tuneParLen = 1 
@@ -42,7 +42,8 @@ seeds <- NULL
 KFOLD <- 3750
 lista <- list()
 gridC50 <- expand.grid( .winnow = c(TRUE,FALSE), .trials=c(1,5,10,15,20), .model="tree" )
-
+INITIAL.WINDOW <- 3000
+HORIZON <- 500
 ################
 
 settingMySeeds <- function(model,tunelen)
@@ -175,8 +176,8 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
           
           for(mod in models)
           {
-            
-            cc <- createTimeSlices(1:nrow(X),initialWindow=1000,horizon=200,fixedWindow=FALSE)
+
+            cc <- createTimeSlices(1:nrow(X),initialWindow=INITIAL.WINDOW,horizon=HORIZON,fixedWindow=FALSE)
             KFOLDS <- length(cc$train)
             if(ncol(X)<10) tunePar = 3
             else tunePar = 10
@@ -184,7 +185,7 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
             seeds <- settingMySeeds(mod,tuneParLen)
             #timeSlicesTrain <- createTimeSlices(1:nrow(training.set),initialWindow = T,horizon = 1,fixedWindow = TRUE)
             my.train.control <- trainControl(method = "timeslice", #number = KFOLD, 
-                                             initialWindow = 1000, horizon = 200, fixedWindow = TRUE,
+                                             initialWindow = INITIAL.WINDOW, horizon = HORIZON, fixedWindow = TRUE,
                                              sampling = samp
                                              ,classProbs = TRUE, summaryFunction = twoClassSummary,
                                              seeds = seeds)
@@ -217,7 +218,7 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
             probb <- extractProb(list(model),testX =test.set[,colnames(test.set)!=pred_sensores[p]])
             tcs <- twoClassSummary(probb,lev=levels(probb$obs))
             # guardar csv con valor real vs predicho
-            dat <- as.data.frame(cbind(real,pred))
+            dat <- as.data.frame(cbind(aux$real,pred))
             colnames(dat)<- c("y_real","y_pred")
             write.csv(x = dat,file = paste(PATH.RESULTS,file.name,"--Y-vs-Y_pred.csv",sep = ""))
             # evaluar en testeo
