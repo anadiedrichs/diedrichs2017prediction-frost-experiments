@@ -1,9 +1,8 @@
 library(doParallel)
-
 library(randomForest)
 library(caret)
 
-source("bnlearn-utils.R")
+source("metrics.R")
 source("dataset-processing.R")
 
 #dataset <- c("dacc")#,"dacc","dacc-temp") #,"dacc-spring") 
@@ -34,13 +33,13 @@ period <- c(1,2,3,4)#,5)
 porc_train = 0.68
 breaks <- c(-20,0,50) # caso Helada y no helada
 # rf: random forest, glm: logistic regression
-models <- c("rpart","C5.0","glm","rf")
+models <- c("C5.0","rf","glm","rpart")
 # variable cuyo valor cambia segun configuracion for
 samp = "none" 
 tuneParLen = 1 
 SEED <- 147
 seeds <- NULL
-KFOLD <- 10
+KFOLD <- 3750
 lista <- list()
 gridC50 <- expand.grid( .winnow = c(TRUE,FALSE), .trials=c(1,5,10,15,20), .model="tree" )
 
@@ -220,7 +219,7 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
           {
             seeds <- settingMySeeds(mod,tuneParLen)
             #timeSlicesTrain <- createTimeSlices(1:nrow(training.set),initialWindow = T,horizon = 1,fixedWindow = TRUE)
-            my.train.control <- trainControl(method = "cv", number = KFOLD, 
+            my.train.control <- trainControl(method = "timeslice", #number = KFOLD, 
                                              initialWindow = t, horizon = 1, fixedWindow = TRUE,
                                              sampling = samp
                                              ,classProbs = TRUE, summaryFunction = twoClassSummary,

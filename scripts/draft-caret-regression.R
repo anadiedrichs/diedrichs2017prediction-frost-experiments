@@ -5,7 +5,7 @@ library(rpart)
 library(bnlearn)
 
 source("bnlearnRegression.R")
-source("bnlearn-utils.R")
+source("metrics.R")
 source("dataset-processing.R")
 
 # si quiero que los experimentos se ejecuten paralelamente en clusters o secuencialmente (porque estoy en debug o rstudio)
