@@ -43,3 +43,9 @@ evaluate.classification <- function(pred, obs) #tested
   acc <- round(c$overall["Accuracy"],2)
   return(list( sens= sens, spec= spec, prec= p, acc= acc, far = FAR, cm = c))
 }
+
+#Logger function
+Log <- function(text, ...) {
+  msg <- sprintf(paste0(as.character(Sys.time()), ": ", text,..., "\n"))
+  cat(msg)
+}
