@@ -10,7 +10,7 @@ source("dataset-processing.R")
 source("reproducibility.R")
 # si quiero que los experimentos se ejecuten paralelamente en clusters o secuencialmente (porque estoy en debug o rstudio)
 PAR <- FALSE
-#dataset <- c("dacc","dacc-temp","dacc-spring") 
+dataset <- c("dacc")#,"dacc-temp","dacc-spring") 
 #dataset <<- get.list.of.datasets(DATA)
 VERBOSE <- TRUE
 TMIN_CHAAR <-NULL
