@@ -66,4 +66,4 @@ print(bn.model)
 # EXTRACt de markov blanket of the network
 mb(bn.model$finalModel$network,node="A")
 
-
+varImp(bn.model,useModel=FALSE)
