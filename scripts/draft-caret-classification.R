@@ -47,7 +47,7 @@ HORIZON <- 500
 
 #' evito uso de boosting para comparar con el competidor
 #' Para usar boosting, incrementar trials, leer sobre parametro trials.
-gridC50 <- expand.grid( .winnow = c(TRUE,FALSE), .trials=c(1),model="tree" )
+gridC50 <- expand.grid( .winnow = c(TRUE,FALSE), .trials=c(1),.model="tree" )
 
 settingMySeeds <- function(model,tunelen)
 { 
