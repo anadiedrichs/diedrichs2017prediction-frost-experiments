@@ -33,7 +33,7 @@ period <- c(1,2)#,3,4)#,5)
 porc_train = 0.68
 breaks <- c(-20,0,50) # caso Helada y no helada
 # rf: random forest, glm: logistic regression
-models <- c("rpart","glm","rf") #"C5.0",
+models <- c("C5.0")#"rpart","glm","rf") #,
 # variable cuyo valor cambia segun configuracion for
 samp = "none" 
 tuneParLen = 1 
@@ -41,10 +41,13 @@ SEED <- 147
 seeds <- NULL
 KFOLD <- 3750
 lista <- list()
-gridC50 <- expand.grid( .winnow = c(TRUE,FALSE), .trials=c(1,5,10,15,20), .model="tree" )
 INITIAL.WINDOW <- 3000
 HORIZON <- 500
 ################
+
+#' evito uso de boosting para comparar con el competidor
+#' Para usar boosting, incrementar trials, leer sobre parametro trials.
+gridC50 <- expand.grid( .winnow = c(TRUE,FALSE), .trials=c(1),model="tree" )
 
 settingMySeeds <- function(model,tunelen)
 { 
@@ -79,7 +82,8 @@ train.models <- function(trCtrl, X, Y,data, modelName,tp)
   } else if(modelName == "C5.0")
   {
     
-    model<- train(x=X,y=Y,trControl=trCtrl,method="C5.0",metric="ROC",tuneLength=tp,verbose=FALSE) #tuneGrid=gridC50,
+    model<- train(x=X,y=Y,trControl=trCtrl,method="C5.0",
+                  metric="ROC",tuneLength=tp,verbose=FALSE,tuneGrid = gridC50) 
     
   }else if(modelName == "rpart")
   {
