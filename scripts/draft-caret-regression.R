@@ -9,15 +9,15 @@ source("metrics.R")
 source("dataset-processing.R")
 source("reproducibility.R")
 # si quiero que los experimentos se ejecuten paralelamente en clusters o secuencialmente (porque estoy en debug o rstudio)
-PAR <- FALSE
+PAR <- TRUE
 dataset <- c("dacc")#,"dacc-temp","dacc-spring") 
 #dataset <<- get.list.of.datasets(DATA)
 VERBOSE <- TRUE
 TMIN_CHAAR <-NULL
 DATA <- "dacc" # possible values: dacc, inta, ur, needed for dataset-processing.R
 if(DATA=="inta"){TMIN_CHAAR <-TRUE}else{TMIN_CHAAR <-FALSE}
-OUTPUT.FILE <- "output-reg-3-" # <- where prints go while cluster is running
-FILE.RESULT.NAME <- "--experimento-dacc-regression-3.csv"
+OUTPUT.FILE <- "output-reg-bnReg-1" # <- where prints go while cluster is running
+FILE.RESULT.NAME <- "--experimento-dacc-regression-bnReg-2.csv"
 PATH.MODELS <- "./models-reg/"
 PATH.RESULTS <- "./results-reg/"
 
@@ -29,13 +29,13 @@ SAVE_MODEL <- TRUE
 config.train <-c("normal")#,"smote")
 config.vars <-c("local","all") #only local variables or all variables.
 #' T cuantos dias anteriores tomamos
-period <- c(1)#,2,3,4)#,5) #TODO IN PRODUCTION
+period <- c(1,2,3,4)#,5) #TODO IN PRODUCTION
 #tunegrid <- expand.grid(.mtry=c(10:25),.ntree=seq(from=500,to=2500,by=500))
 # porcentaje para train set split
 porc_train = 0.68
 breaks <- c(-20,0,50) # caso Helada y no helada
 # rf: random forest, glm: logistic regression
-models <- c("rf")#"bnReg", #TODO IN PRODUCTION  "rpart",
+models <- c("bnReg")#,"rf")#, #TODO IN PRODUCTION  "rpart",
 # variable cuyo valor cambia segun configuracion for
 samp = "none" 
 tuneParLen = 1 
@@ -196,9 +196,16 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
               bnregmb <- mb(model$finalModel$network,node="Y")
               df.bnregmb <- data.frame(nodes=bnregmb)
               write.csv(x = df.bnregmb,file = paste(PATH.RESULTS,file.name,"--markovBlanket.csv",sep = ""))
+              
               # plot Bayesian network
-              png(paste(PATH.RESULTS,file.name,"--BayesianNetwork.png",sep = ""))
-              print(plot(model$finalModel$network))
+              #png(paste(PATH.RESULTS,file.name,"--BayesianNetwork.png",sep = ""))
+              #print(plot(model$finalModel$network))
+              #dev.off()
+              
+              vv <- varImp(model,useModel=FALSE) 
+              write.csv(x = as.data.frame(vv$importance),file = paste(PATH.RESULTS,file.name,"--importance.csv",sep = ""))
+              png(paste(PATH.RESULTS,file.name,"--importance.png",sep = ""))
+              print(plot(varImp(model)))
               dev.off()
 
             }else{ #variable importance list
