@@ -181,7 +181,7 @@ build.dataset.for.experiment <- function(t, dataset, predictores, predVariable, 
   }else{# quitar variables en *_t, menos la del predictor
     
     X <- training.set[,-which(colnames(training.set) %in% predictors)]
-    data <- cbind(training.set,Y) # agrego variable del predictor 
+    data <- cbind(X,Y) # agrego variable del predictor 
   }
   
   return(list(data=data,x=X,y=Y, train=training.set,test=test.set, real=real))
@@ -227,7 +227,7 @@ build.dataset.classification <- function(t, dataset, predictores, predVariable, 
   }else{# quitar variables en *_t, menos la del predictor
     
     X <- training.set[,-which(colnames(training.set) %in% predictors)]
-    data <- cbind(training.set,Y) # agrego variable del predictor 
+    data <- cbind(X,Y) # agrego variable del predictor 
   }
   
   return(list(data=data,x=X,y=Y, train=training.set,test=test.set, real=real))

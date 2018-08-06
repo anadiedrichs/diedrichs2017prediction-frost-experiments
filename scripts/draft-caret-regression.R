@@ -16,8 +16,8 @@ VERBOSE <- TRUE
 TMIN_CHAAR <-NULL
 DATA <- "dacc" # possible values: dacc, inta, ur, needed for dataset-processing.R
 if(DATA=="inta"){TMIN_CHAAR <-TRUE}else{TMIN_CHAAR <-FALSE}
-OUTPUT.FILE <- "output-reg-bnReg-1" # <- where prints go while cluster is running
-FILE.RESULT.NAME <- "--experimento-dacc-regression-bnReg-2.csv"
+OUTPUT.FILE <- "output-reg-bnReg-Junin-1" # <- where prints go while cluster is running
+FILE.RESULT.NAME <- "--experimento-dacc-regression-bnReg-Junin-1.csv"
 PATH.MODELS <- "./models-reg/"
 PATH.RESULTS <- "./results-reg/"
 
@@ -27,26 +27,30 @@ packages <- c("randomForest","caret","DMwR","readr","xts","timeDate","rpart")
 SAVE_MODEL <- TRUE
 #normal: just split train and test set, smote: oversampling of the minority class.
 config.train <-c("normal")#,"smote")
-config.vars <-c("local","all") #only local variables or all variables.
+config.vars <-c("all")#local","all") #only local variables or all variables.
 #' T cuantos dias anteriores tomamos
-period <- c(1,2,3,4)#,5) #TODO IN PRODUCTION
+period <- c(1)#,2,3,4)#,5) #TODO IN PRODUCTION
+#1: Junin, 2: Tunuyan, 3: agua amarga, 4: paredes, 5: la llave
+stations <- c(1)
 #tunegrid <- expand.grid(.mtry=c(10:25),.ntree=seq(from=500,to=2500,by=500))
 # porcentaje para train set split
 porc_train = 0.68
 breaks <- c(-20,0,50) # caso Helada y no helada
 # rf: random forest, glm: logistic regression
 models <- c("bnReg")#,"rf")#, #TODO IN PRODUCTION  "rpart",
-# variable cuyo valor cambia segun configuracion for
+
+
+# iW 3200 y h 500 dan 52 resamples
+INITIAL.WINDOW <- 3200
+HORIZON <- 500
+
+
 samp = "none" 
 tuneParLen = 1 
-
 SEED <- 147
 seeds <- NULL
-KFOLD <- 3750 #TODO IN PRODUCTION
+KFOLDS <- NULL #determinado en createTimeSlices para timeseries cross validation
 lista <- list()
-
-INITIAL.WINDOW <- 3000
-HORIZON <- 500
 
 ################
 
@@ -54,9 +58,9 @@ settingMySeeds <- function(model,tunelen) #TODO
 { 
   ss <- NULL
   
-  if(model=="rpart") ss <- setSeeds(numbers=KFOLD,tunes = 10,seed = SEED) #TODO tuneLenRpart
-  if(model=="rf")  ss <- setSeeds(numbers=KFOLD,tunes = tunelen,seed = SEED)
-  if(model=="bnReg") ss <- setSeeds(numbers=KFOLD,tunes = 8,seed = SEED) # por defecto, 8 parametros a tunear
+  if(model=="rpart") ss <- setSeeds(numbers=KFOLDS,tunes = 10,seed = SEED) #TODO tuneLenRpart
+  if(model=="rf")  ss <- setSeeds(numbers=KFOLDS,tunes = tunelen,seed = SEED)
+  if(model=="bnReg") ss <- setSeeds(numbers=KFOLDS,tunes = 8,seed = SEED) # por defecto, 8 parametros a tunear
   ss
 }
 
@@ -126,7 +130,7 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
   
   
  # foreach(p = 1:length(pred_sensores),.packages = packages) %dopar% # 
-   for(p in 1:length(pred_sensores)) #solo corro Junin 
+   for(p in 1:length(stations))  
   {
     
     Log(pred_sensores[p])
@@ -156,6 +160,12 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
           data <- aux$data
           test.set <- aux$test
           
+          if(VERBOSE){
+            print("--X---")
+            print(colnames(X))
+            print("--DATA---")
+            print(colnames(data))
+          }
           #fila_header <- paste(dd$name,pred_sensores[p],config.train[ct],config.vars[cvars],t,sep = ",")
           fila_header <- cbind(dd$name,pred_sensores[p],config.train[ct],config.vars[cvars],t)
           name_header <- paste(dd$name,pred_sensores[p],config.train[ct],config.vars[cvars],t,sep = "--")
@@ -163,7 +173,7 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
           for(mod in models)
           {
             Log("Model ",mod)
-            cc <- createTimeSlices(1:nrow(X),initialWindow=300,horizon=100,fixedWindow=FALSE)
+            cc <- createTimeSlices(1:nrow(X),initialWindow=INITIAL.WINDOW,horizon=HORIZON,fixedWindow=FALSE)
             KFOLDS <- length(cc$train)
             if(ncol(X)<10) tunePar = 3
             else tunePar = 10
@@ -171,7 +181,7 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
             seeds <- settingMySeeds(mod,tunePar)
             #timeSlicesTrain <- createTimeSlices(1:nrow(training.set),initialWindow = T,horizon = 1,fixedWindow = TRUE)
             my.train.control <- trainControl(method = "timeslice",# number = KFOLD,
-                                             initialWindow = 300, horizon = 100, fixedWindow = TRUE,
+                                             initialWindow = INITIAL.WINDOW, horizon = HORIZON, fixedWindow = TRUE,
                                              seeds = seeds)
 
 
@@ -187,7 +197,7 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
             if(SAVE_MODEL){save(model, file = paste(PATH.MODELS,file.name,".RData",sep=""),compress = TRUE)}
             if(VERBOSE){
               summary(model)
-              print(model)
+              #print(model)
             }
             #varimp model o lista de variables importantes
             if(mod == "bnReg")
@@ -203,6 +213,7 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
               #dev.off()
               
               vv <- varImp(model,useModel=FALSE) 
+              print(vv)
               write.csv(x = as.data.frame(vv$importance),file = paste(PATH.RESULTS,file.name,"--importance.csv",sep = ""))
               png(paste(PATH.RESULTS,file.name,"--importance.png",sep = ""))
               print(plot(varImp(model)))
