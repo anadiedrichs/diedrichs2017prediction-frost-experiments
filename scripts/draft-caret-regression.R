@@ -9,7 +9,7 @@ source("metrics.R")
 source("dataset-processing.R")
 source("reproducibility.R")
 # si quiero que los experimentos se ejecuten paralelamente en clusters o secuencialmente (porque estoy en debug o rstudio)
-PAR <- TRUE
+PAR <- FALSE
 dataset <- c("dacc")#,"dacc-temp","dacc-spring") 
 #dataset <<- get.list.of.datasets(DATA)
 VERBOSE <- TRUE
@@ -29,7 +29,7 @@ SAVE_MODEL <- TRUE
 config.train <-c("normal")#,"smote")
 config.vars <-c("all")#local","all") #only local variables or all variables.
 #' T cuantos dias anteriores tomamos
-period <- c(1)#,2,3,4)#,5) #TODO IN PRODUCTION
+period <- c(2)#,2,3,4)#,5) #TODO IN PRODUCTION
 #1: Junin, 2: Tunuyan, 3: agua amarga, 4: paredes, 5: la llave
 stations <- c(1)
 #tunegrid <- expand.grid(.mtry=c(10:25),.ntree=seq(from=500,to=2500,by=500))
@@ -149,7 +149,7 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
         Log("config.vars ",config.vars[cvars])
         
         #foreach(t = 1:length(period),.packages = packages) %dopar% 
-        for(t in period)
+        for(t in 1:length(period))
         {
           Log("T value ",t)
           
