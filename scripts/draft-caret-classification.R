@@ -144,7 +144,7 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
   Log("DATASET ",dd$name)
 
   #foreach(p = 1:length(pred_sensores),.packages = packages) %dopar% # 
-   for(p in 1:length(pred_sensores)) 
+   for(p in 1:length(stations)) 
   {
     Log(pred_sensores[p])
    
