@@ -1,6 +1,9 @@
 library(doParallel)
 library(randomForest)
 library(caret)
+library(rpart)
+library(C50)
+
 source("reproducibility.R")
 source("metrics.R")
 source("dataset-processing.R")
@@ -11,13 +14,11 @@ VERBOSE <- TRUE
 TMIN_CHAAR <-NULL
 DATA <- "dacc" # possible values: dacc, inta, ur, needed for dataset-processing.R
 if(DATA=="inta"){TMIN_CHAAR <-TRUE}else{TMIN_CHAAR <-FALSE}
-OUTPUT.FILE <- "output-" # <- where prints go while cluster is running
-FILE.RESULT.NAME <- "--experimento-dacc.csv"
+OUTPUT.FILE <- "output-Junin" # <- where prints go while cluster is running
+FILE.RESULT.NAME <- "--experimento-class-Junin.csv"
 PATH.MODELS <- "./models/"
 PATH.RESULTS <- "./results/"
 PATH.SAVE.DATASET <- "./datasets/"
-
-packages <- c("randomForest","caret","DMwR","readr","xts","timeDate")
 
 # si quiero guardar los modelos en .RData file 
 SAVE_MODEL <- TRUE
@@ -25,24 +26,30 @@ SAVE_MODEL <- TRUE
 PAR <- FALSE
 #normal: just split train and test set, smote: oversampling of the minority class.
 config.train <-c("smote","normal")
-config.vars <-c("local","all") #only local variables or all variables.
+config.vars <-c("all")#local","all") #only local variables or all variables.
 #' T cuantos dias anteriores tomamos
-period <- c(1,2)#,3,4)#,5)
+period <- c(1,2)#,2)#,3,4)#,5)
+# rf: random forest, glm: logistic regression
+models <- c("C5.0","glm","rpart")#,"rf") #,
+#1: Junin, 2: Tunuyan, 3: agua amarga, 4: paredes, 5: la llave
+stations <- c(1)#,2,3,4,5)
+
+INITIAL.WINDOW <- 3200
+HORIZON <- 500
 #tunegrid <- expand.grid(.mtry=c(10:25),.ntree=seq(from=500,to=2500,by=500))
 # porcentaje para train set split
 porc_train = 0.68
 breaks <- c(-20,0,50) # caso Helada y no helada
-# rf: random forest, glm: logistic regression
-models <- c("C5.0")#"rpart","glm","rf") #,
 # variable cuyo valor cambia segun configuracion for
 samp = "none" 
 tuneParLen = 1 
 SEED <- 147
 seeds <- NULL
-KFOLD <- 3750
+KFOLDS <- NULL
 lista <- list()
-INITIAL.WINDOW <- 3000
-HORIZON <- 500
+
+packages <- c("randomForest","caret","DMwR","readr","xts","timeDate")
+
 ################
 
 #' evito uso de boosting para comparar con el competidor
@@ -53,13 +60,12 @@ settingMySeeds <- function(model,tunelen)
 { 
   ss <- NULL
   
-  if(model=="glm") ss <- setSeeds(numbers=KFOLD,seed = SEED)
-  if(model=="rf")  ss <- setSeeds(numbers=KFOLD,tunes = tunelen,seed = SEED)
-  if(model=="C5.0") ss <- setSeeds(numbers=KFOLD,tunes = nrow(gridC50),seed = SEED)
-  if(model=="rpart") ss <- setSeeds(numbers=KFOLD,tunes = tunelen,seed = SEED)
+  if(model=="glm") ss <- setSeeds(numbers=KFOLDS,seed = SEED)
+  if(model=="rf")  ss <- setSeeds(numbers=KFOLDS,tunes = tunelen,seed = SEED)
+  if(model=="C5.0") ss <- setSeeds(numbers=KFOLDS,tunes = nrow(gridC50),seed = SEED)
+  if(model=="rpart") ss <- setSeeds(numbers=KFOLDS,tunes = tunelen,seed = SEED)
   ss
 }
-
 
 #' function to call each model through caret
 train.models <- function(trCtrl, X, Y,data, modelName,tp)
@@ -136,12 +142,10 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
   ## end of issue #17
   pred_sensores <- dd$pred
   Log("DATASET ",dd$name)
-  
-  
+
   #foreach(p = 1:length(pred_sensores),.packages = packages) %dopar% # 
    for(p in 1:length(pred_sensores)) 
   {
-    
     Log(pred_sensores[p])
    
     # foreach(c = 1:length(config.train),.packages = packages) %dopar%  # 
@@ -167,11 +171,17 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
                                               pred_sensores, 
                                               pred_sensores[p],
                                               config=config.vars[cvars], breaks= breaks)
-          
           X <- aux$x
           Y <- aux$y
           data <- aux$data
           test.set <- aux$test
+          
+          if(VERBOSE){
+            print("--X---")
+            print(colnames(X))
+            print("--DATA---")
+            print(colnames(data))
+          }
           
           #fila_header <- paste(dd$name,pred_sensores[p],config.train[ct],config.vars[cvars],t,sep = ",")
           fila_header <- cbind(dd$name,pred_sensores[p],config.train[ct],config.vars[cvars],t)
@@ -185,37 +195,38 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
             KFOLDS <- length(cc$train)
             if(ncol(X)<10) tunePar = 3
             else tunePar = 10
-            
+
             seeds <- settingMySeeds(mod,tuneParLen)
             #timeSlicesTrain <- createTimeSlices(1:nrow(training.set),initialWindow = T,horizon = 1,fixedWindow = TRUE)
-            my.train.control <- trainControl(method = "timeslice", #number = KFOLD, 
+            my.train.control <- trainControl(method = "timeslice", #number = KFOLD,
                                              initialWindow = INITIAL.WINDOW, horizon = HORIZON, fixedWindow = TRUE,
                                              sampling = samp
                                              ,classProbs = TRUE, summaryFunction = twoClassSummary,
                                              seeds = seeds)
-            
-            
+
+
             start_time <- Sys.time()
             model <- train.models(trCtrl=my.train.control, X=X, Y=Y,data=data, modelName=mod, tp = tunePar)
             end_time <- Sys.time()
             runtime <- round(as.numeric(difftime(end_time, start_time, units = "secs")),3)
-            
+
             fila <- cbind(fila_header,mod,runtime)
             file.name <- paste(name_header,mod,sep = "--")
-            
+
             # save model
             if(SAVE_MODEL){save(model, file = paste(PATH.MODELS,file.name,".RData",sep=""),compress = TRUE)}
             
+            if(VERBOSE){
             summary(model)
-            print(model)
-            
+            #print(model)
+            }
             #varimp model o lista de variables importantes
             vv <- varImp(model) # si tiene varImpModel
             write.csv(x = as.data.frame(vv$importance),file = paste(PATH.RESULTS,file.name,"--importance.csv",sep = ""))
             png(paste(PATH.RESULTS,file.name,"--importance.png",sep = ""))
             print(plot(varImp(model)))
             dev.off()
-            
+
             # predictions
             pred <- predict(model,test.set)
             #ppp <- extractPrediction(list(model),testX =test.set[,colnames(test.set)!=pred_sensores[p]])
@@ -232,24 +243,24 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
             row <- cbind(fila,eee$far,t(eee$cm$overall),t(eee$cm$byClass),t(tcs))
             write.table(row, file=RESUMEN, append = TRUE,row.names = FALSE,col.names = FALSE, sep = ",")
             Log(row)
-            
-            # agregar modelo a una lista 
-            lista[[file.name]] <- model
-            
+
+            # agregar modelo a una lista
+            #lista[[file.name]] <- model
+
           }# for each model
           
         }# for por T
       }# for each config.vars
     }# for each config.train
     # plot y results de resample de los modelos 
-    resamps <- resamples(lista)
-    write.csv(resamps$values,file=paste(PATH.RESULTS,dataset[j],"--",pred_sensores[p],"--resamples.csv",sep=""))
-    png(paste(PATH.RESULTS,dataset[j],"--",pred_sensores[p],"--bwplot.png",sep=""))
-    print(bwplot(resamps))
-    dev.off()
-    png(paste(PATH.RESULTS,dataset[j],"--",pred_sensores[p],"--dotplot.png",sep=""))
-    print(dotplot(resamps))
-    dev.off()
+    # resamps <- resamples(lista)
+    # write.csv(resamps$values,file=paste(PATH.RESULTS,dataset[j],"--",pred_sensores[p],"--resamples.csv",sep=""))
+    # png(paste(PATH.RESULTS,dataset[j],"--",pred_sensores[p],"--bwplot.png",sep=""))
+    # print(bwplot(resamps))
+    # dev.off()
+    # png(paste(PATH.RESULTS,dataset[j],"--",pred_sensores[p],"--dotplot.png",sep=""))
+    # print(dotplot(resamps))
+    # dev.off()
     lista <- list()
   }# for por cada sensor o estacion a predecir helada/no helada
 }# for dataset
