@@ -14,25 +14,25 @@ VERBOSE <- TRUE
 TMIN_CHAAR <-NULL
 DATA <- "dacc" # possible values: dacc, inta, ur, needed for dataset-processing.R
 if(DATA=="inta"){TMIN_CHAAR <-TRUE}else{TMIN_CHAAR <-FALSE}
-OUTPUT.FILE <- "output-Junin" # <- where prints go while cluster is running
-FILE.RESULT.NAME <- "--experimento-class-Junin.csv"
-PATH.MODELS <- "./models/"
-PATH.RESULTS <- "./results/"
-PATH.SAVE.DATASET <- "./datasets/"
+OUTPUT.FILE <- "output-llave" # <- where prints go while cluster is running
+FILE.RESULT.NAME <- "--experimento-class-llave.csv"
+PATH.MODELS <- "./models-class/"
+PATH.RESULTS <- "./results-class/"
+PATH.SAVE.DATASET <- "./datasets-class/"
 
 # si quiero guardar los modelos en .RData file 
 SAVE_MODEL <- TRUE
 # si quiero que los experimentos se ejecuten paralelamente en clusters o secuencialmente (porque estoy en debug o rstudio)
-PAR <- FALSE
+PAR <- FALSE  #TODO PRODUCTION
 #normal: just split train and test set, smote: oversampling of the minority class.
 config.train <-c("smote","normal")
 config.vars <-c("all")#local","all") #only local variables or all variables.
 #' T cuantos dias anteriores tomamos
 period <- c(1,2)#,2)#,3,4)#,5)
 # rf: random forest, glm: logistic regression
-models <- c("C5.0","glm","rpart")#,"rf") #,
+models <- c("rf")#C5.0","glm","rpart")#,"rf") #,
 #1: Junin, 2: Tunuyan, 3: agua amarga, 4: paredes, 5: la llave
-stations <- c(1)#,2,3,4,5)
+stations <- c(5)#,2,3,4,5)
 
 INITIAL.WINDOW <- 3200
 HORIZON <- 500
@@ -144,7 +144,7 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
   Log("DATASET ",dd$name)
 
   #foreach(p = 1:length(pred_sensores),.packages = packages) %dopar% # 
-   for(p in 1:length(stations)) 
+   for(p in stations) 
   {
     Log(pred_sensores[p])
    
