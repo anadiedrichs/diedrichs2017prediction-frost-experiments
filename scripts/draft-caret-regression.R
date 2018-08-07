@@ -29,9 +29,9 @@ SAVE_MODEL <- TRUE
 config.train <-c("normal")#,"smote")
 config.vars <-c("all")#local","all") #only local variables or all variables.
 #' T cuantos dias anteriores tomamos
-period <- c(2)#,2,3,4)#,5) #TODO IN PRODUCTION
+period <- c(1)#,2,3,4)#,5) #TODO IN PRODUCTION
 #1: Junin, 2: Tunuyan, 3: agua amarga, 4: paredes, 5: la llave
-stations <- c(1)
+stations <- c(2)
 #tunegrid <- expand.grid(.mtry=c(10:25),.ntree=seq(from=500,to=2500,by=500))
 # porcentaje para train set split
 porc_train = 0.68
@@ -127,10 +127,8 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
   pred_sensores <- dd$pred
   Log("DATASET ",dd$name)
   
-  
-  
  # foreach(p = 1:length(pred_sensores),.packages = packages) %dopar% # 
-   for(p in 1:length(stations))  
+   for(p in stations)  
   {
     
     Log(pred_sensores[p])
