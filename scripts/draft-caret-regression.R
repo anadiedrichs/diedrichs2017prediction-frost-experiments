@@ -171,7 +171,22 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
           for(mod in models)
           {
             Log("Model ",mod)
-            cc <- createTimeSlices(1:nrow(X),initialWindow=INITIAL.WINDOW,horizon=HORIZON,fixedWindow=FALSE)
+            
+            isFixed <- TRUE
+            if(mod == "bnReg")
+            {
+              INITIAL.WINDOW <- 250
+              HORIZON <- 50
+              #isFixed <- TRUE
+              
+            }else
+            {
+              INITIAL.WINDOW <- 3200
+              HORIZON <- 500
+              
+            }
+            cat("InitialWindows ",INITIAL.WINDOW," hORIZON ", HORIZON)
+            cc <- createTimeSlices(1:nrow(X),initialWindow=INITIAL.WINDOW,horizon=HORIZON,fixedWindow=isFixed)
             KFOLDS <- length(cc$train)
             if(ncol(X)<10) tunePar = 3
             else tunePar = 10
@@ -179,7 +194,7 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
             seeds <- settingMySeeds(mod,tunePar)
             #timeSlicesTrain <- createTimeSlices(1:nrow(training.set),initialWindow = T,horizon = 1,fixedWindow = TRUE)
             my.train.control <- trainControl(method = "timeslice",# number = KFOLD,
-                                             initialWindow = INITIAL.WINDOW, horizon = HORIZON, fixedWindow = TRUE,
+                                             initialWindow = INITIAL.WINDOW, horizon = HORIZON, fixedWindow = isFixed,
                                              seeds = seeds)
 
 
