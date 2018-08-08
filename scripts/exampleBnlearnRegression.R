@@ -1,15 +1,24 @@
 
 library(caret)
 library(bnlearn)
+source("metrics.R")
+source("reproducibility.R")
+SEED <- 147
 
-RMSE = function(m, o){  sqrt(mean((m - o)^2)) } #tested
-rsq <- function(x, y){ summary(lm(y~x))$r.squared } #tested
-MAE <- function(m, o){  mean(abs(m - o))} #tested
+settingMySeeds <- function(model,tunelen) #TODO
+{ 
+  ss <- NULL
+  
+  if(model=="rpart") ss <- setSeeds(numbers=KFOLDS,tunes = 10,seed = SEED) #TODO tuneLenRpart
+  if(model=="rf")  ss <- setSeeds(numbers=KFOLDS,tunes = tunelen,seed = SEED)
+  if(model=="bnReg") ss <- setSeeds(numbers=KFOLDS,tunes = 8,seed = SEED) # por defecto, 8 parametros a tunear
+  ss
+}
 
 source("bnlearnRegression.R")
+source("metrics.R")
 
 data(learning.test)
-
 data(gaussian.test)
 net = hc(gaussian.test)
 # deberia chequear que net tenga todos arcos dirigidos
@@ -18,21 +27,32 @@ net = hc(gaussian.test)
 fit = bn.fit(net, gaussian.test)
 
 # ejemplo o intento con caret 
+# VER PORQUE DEMORA TANTO BNREGRESSION
+cc <- createTimeSlices(1:3600,initialWindow=250,horizon=100,fixedWindow=FALSE)
+KFOLDS <<- length(cc$train)
+seeds <- settingMySeeds("bnReg",8)
 
-fitControl <- trainControl(method = "cv",
-                           number = 5,
-                           search = "grid")
+#timeSlicesTrain <- createTimeSlices(1:nrow(training.set),initialWindow = T,horizon = 1,fixedWindow = TRUE)
+fitControl <- trainControl(method = "timeslice",# number = KFOLD,
+                                 initialWindow = 250, horizon = 100, fixedWindow = TRUE,
+                                 seeds = seeds)
 
-set.seed(825)
-bn.model <- caret::train(x= gaussian.test, # dataset con todas las variables
-                         y = gaussian.test$A, # pasar cualquier variable numerica, es node
+
+start_time <- Sys.time()
+bn.model <- caret::train(x= gaussian.test[1:3600,], # dataset con todas las variables
+                         y = gaussian.test[1:3600,]$A, # pasar cualquier variable numerica, es node
                          data = gaussian.test, 
                          #preProc = c("center", "scale"),
                    method = bnReg, 
                    trControl = fitControl, 
                    node = "A") # importante, sobre cual variable se quiere mejorar la prediccion
+end_time <- Sys.time()
+runtime <- round(as.numeric(difftime(end_time, start_time, units = "secs")),3)
+
 plot(bn.model$finalModel$network)
 print(bn.model)
+
+
 
 # varImp no funciona, requiere regresar variables y un número que indique su importancia.
 #vvv <- varImp(bn.model,node="A")
@@ -67,3 +87,5 @@ print(bn.model)
 mb(bn.model$finalModel$network,node="A")
 
 varImp(bn.model,useModel=FALSE)
+
+
