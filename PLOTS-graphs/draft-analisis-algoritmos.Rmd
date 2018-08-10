@@ -1,0 +1,197 @@
+---
+title: "Gráficos y su interprestación"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r}
+suppressMessages(library(readr))
+suppressMessages(library(ggplot2))
+suppressMessages(library(gridExtra))
+suppressMessages(library(tidyverse))
+suppressMessages(library(lazyeval))
+
+dataset <- suppressMessages(read_csv("classification-results.csv"))
+dataset[,8:ncol(dataset)] <- round(dataset[,8:ncol(dataset)],digits = 3)
+
+stations <- unique(dataset$var)
+algoritmos <- unique(dataset$alg)
+metrics <- c("FAR","Sensitivity","Specificity","Accuracy","Kappa","F1","Precision")
+
+#' ## Carga dataset
+#' Creación de dataset genérico para resultados clasificación
+df <- dataset %>%
+  unite(dataset, 
+        col=label,c("dataset","var","config.train","config.vars","T","alg"),
+        sep = "-",remove=FALSE) %>% 
+  select(label,dataset,var,config.train,config.vars,T,alg,FAR,Sensitivity,Specificity,Accuracy,Kappa,F1,Precision) 
+
+```
+
+
+## Clasificación
+
+Estaciones vs algoritmos: cuales de los algoritmos son "mejores" respecto a F1, Recall, precision
+
+
+```{r}
+
+df3 <-  df %>% filter( dataset == "dacc" & T==1 ) 
+
+```
+```{r}
+p <-ggplot(aes(y = Precision , x = var, fill = alg), data = df3) + geom_boxplot() + coord_flip()
+print(p)
+
+p <-ggplot(aes(y = Sensitivity , x = var, fill = alg), data = df3) + geom_boxplot() + coord_flip()
+print(p)
+
+#png("plot-estaciones-vs-algs-F1-filtro-datasetDacc-T1.png")
+p <-ggplot(aes(y = F1 , x = var, fill = alg), data = df3) + 
+  geom_boxplot() + coord_flip() #+ labs(fill="T")
+
+print(p)
+
+#dev.off()
+```
+Ahora, lo mismo que lo anterior pero considerando todos los T
+
+```{r}
+
+df3 <-  df %>% filter( dataset == "dacc" ) 
+
+```
+```{r}
+p <-ggplot(aes(y = Precision , x = var, fill = alg), data = df3) + geom_boxplot() + coord_flip()
+print(p)
+
+p <-ggplot(aes(y = Sensitivity , x = var, fill = alg), data = df3) + geom_boxplot() + coord_flip()
+print(p)
+
+#png("plot-estaciones-vs-algs-F1-filtro-datasetDacc-T1.png")
+p <-ggplot(aes(y = F1 , x = var, fill = alg), data = df3) + 
+  geom_boxplot() + coord_flip() #+ labs(fill="T")
+
+print(p)
+
+#dev.off()
+```
+RF por cada una de las estaciones
+
+
+```{r}
+
+df3 <-  df %>% filter( dataset == "dacc" & T==1 & alg=="rf") 
+
+
+p <-ggplot(aes(y = Precision , x = var, fill = config.vars), data = df3) + geom_boxplot() + coord_flip() + labs(title="Random forest por estaciones")
+print(p)
+
+p <-ggplot(aes(y = Sensitivity , x = var, fill = config.vars), data = df3) + geom_boxplot() + coord_flip() + labs(title="Random forest por estaciones")
+print(p)
+
+p <-ggplot(aes(y = F1 , x = var, fill = config.vars), data = df3) + 
+  geom_boxplot() + coord_flip() #+ labs(fill="T")
+print(p)
+```
+
+## GLM por cada una de las estaciones
+
+
+```{r}
+
+df3 <-  df %>% filter( dataset == "dacc" & T==1 & alg=="glm") 
+
+p <-ggplot(aes(y = Precision , x = var, fill = config.vars), data = df3) + geom_boxplot() + coord_flip() + labs(title="Random forest por estaciones")
+print(p)
+
+p <-ggplot(aes(y = Sensitivity , x = var, fill = config.vars), data = df3) + geom_boxplot() + coord_flip() + labs(title="Random forest por estaciones")
+print(p)
+
+p <-ggplot(aes(y = F1 , x = var, fill = config.vars), data = df3) + 
+  geom_boxplot() + coord_flip() #+ labs(fill="T")
+print(p)
+```
+
+
+Comportamiento general de local vs all de los algoritmos por cada estación según métrica. Cada linea incluye casos T=1...4, normal/smote, all/local
+
+```{r}
+
+for(s in stations){
+  
+  df1 <- df %>% filter( var == s ) 
+  
+  p <-ggplot(aes(y = F1 , x = alg, fill = config.vars), data = df1) + 
+    geom_boxplot() + coord_flip() + labs(title=paste("Estación",s,sep="  "))
+  print(p)
+  p <-ggplot(aes(y = Sensitivity , x = alg, fill = config.vars), data = df1) + 
+    geom_boxplot() + coord_flip() + labs(title=paste("Estación",s,sep="  "))
+  print(p)
+  p <-ggplot(aes(y = Precision , x = alg, fill = config.vars), data = df1) + 
+    geom_boxplot() + coord_flip() + labs(title=paste("Estación",s,sep="  "))
+  print(p)
+
+}
+
+```
+
+```{r}
+library(reshape)
+df3 <-  df %>% filter( dataset == "dacc") %>% select(-one_of(c("FAR")))
+
+#  melt(df3,id.vars="label")
+df4 <- melt(as.data.frame(df3),
+            id.vars =(c("label","dataset","var","config.train","config.vars","T","alg")),
+            measure.vars = metrics[-1])
+
+p <-ggplot(aes(y = value , x = var, fill = variable), data = df4) + 
+  geom_boxplot() + coord_flip() + labs(title="Variabilidad de las métricas por las estaciones")
+print(p)
+```
+```{r}
+df4 <- df %>% filter( dataset == "dacc")   
+df4 <- melt(as.data.frame(df4),
+            id.vars =(c("label","dataset","var","config.train","config.vars","T","alg")),
+            measure.vars = metrics)
+
+for(a in algoritmos)
+{
+  for(m in metrics)
+  {
+    df5 <- df4 %>% filter( alg == a & variable == m) 
+    p <-ggplot(aes(y = value , x = var, fill = config.vars), data = df5) + 
+      geom_boxplot() + coord_flip() + labs(title=paste("Comportamiento de ",m," en modelo ",a,sep=""))
+    print(p)
+  }
+}
+```
+
+Random forest
+
+* En agua  amarga y Tunuyan, el FAR es menor en modelos config all. También para estas estaciones config all tiene mayores valores de specificity y precision que config local, lo contrario para las restantes. Lo contrario para el resto de las estaciones (gana local)
+* Los mejores modelos en terminos de sensitivity/recall son config all
+* Valores de accuracy entre (aproximado) 0.89 y 0.94
+* Valor de Kappa aumenta (hay mayores valores) con config all, analizando las medias
+
+
+Comparación normal vs smote por estación para métricas sensitivity y precision
+
+```{r}
+p <-ggplot(aes(y = Precision , x = var, fill = config.train), data = df) + geom_boxplot() + coord_flip()
+print(p)
+
+p <-ggplot(aes(y = Sensitivity , x = var, fill = config.train), data = df) + geom_boxplot() + coord_flip()
+print(p)
+
+p <-ggplot(aes(y = F1 , x = var, fill = config.train), data = df) + geom_boxplot() + coord_flip()
+print(p)
+
+```
+La configuración SMoTE aumenta la sensitivity/F1 en detrimento de la precision. Es una consecuencia esperable.
+
+
+
+
+

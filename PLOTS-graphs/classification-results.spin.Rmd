@@ -1,0 +1,160 @@
+## Resultados clasificación
+
+
+```{r }
+library(readr)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(lazyeval)
+
+dataset <- read_csv("classification-results.csv")
+dataset[,8:ncol(dataset)] <- round(dataset[,8:ncol(dataset)],digits = 3)
+```
+
+ESTACION: valores posibles en la columna vars. Son las estaciones meteorológicas
+
+```{r }
+print(unique(dataset$var))
+```
+
+DATASET: valores posibles "dacc", faltan casos de "dacc-temp","dacc-spring"
+
+Caso columna o dato que evalue si colabora o no el enfoque agregar vecinos.
+
+
+```{r }
+ESTACION <- "junin.temp_min"
+DATASET <- "dacc"
+ALGORITMO <- "glm"
+
+stations <- dataset$var
+algoritmos <- dataset$alg
+metrics <- c("FAR","Sensitivity","Specificity","Accuracy","Kappa","F1","Precision")
+```
+
+## Carga dataset
+Creación de dataset genérico para resultados clasificación
+
+```{r }
+df <- dataset %>%
+  unite(dataset, 
+        col=label,c("dataset","var","config.train","config.vars","T","alg"),
+        sep = "-",remove=FALSE) %>% 
+  select(label,dataset,var,config.train,config.vars,T,alg,FAR,Sensitivity,Specificity,Accuracy,Kappa,F1,Precision) 
+```
+
+## ENFOQUE local vs all
+
+Vistazo del dataset del que hacemos la resta:
+
+
+```{r }
+df %>%
+  select(dataset,var,config.train,config.vars,T,alg,FAR) %>%
+  filter(dataset == DATASET & var == ESTACION ) %>% # & alg=="glm" & T == 1 ) %>%
+  group_by(dataset,var,config.train,T,alg) %>% 
+  arrange(dataset,var,config.train,T,alg,desc(config.vars)) %>% 
+  mutate(local_vs_all = lag(FAR) - FAR)
+```
+
+para crear columna local vs all
+
+```{r }
+mutate_call_ <- function(df, col1, col2, new_col_name) {
+  mutate_call = lazyeval::interp(~ lag(a) - b, a = as.name(col1), b = as.name(col2))
+ df %>% mutate_(.dots = setNames(list(mutate_call), new_col_name))
+}
+```
+
+df data.frame
+
+NO IMPLEMENTADO filtro: filtro a pasar a ggplot en filter
+
+m metrica, valores posibles o referencia array metrics o mirar dataset.
+
+s: character, nombre de la estacion o variable predecida
+
+```{r }
+plot_local_vs_all <- function(df,m,s)
+{
+  df1 <- df %>%
+    select(dataset,var,config.train,config.vars,T,alg,m) %>%
+    filter(dataset == DATASET & var == s ) %>% # & alg=="glm" & T == 1 ) %>%
+    group_by(dataset,var,config.train,T,alg) %>% 
+    arrange(dataset,var,config.train,T,alg,desc(config.vars)) %>% 
+    mutate_call_(m, m, "local_vs_all") %>% 
+    filter(!is.na(local_vs_all))  %>%
+    unite(col=label,c("dataset","var","config.train","T","alg"),
+          sep = "-",remove=FALSE) 
+  
+  
+  p <- ggplot(data=df1, aes(x= reorder(label,-local_vs_all), y=local_vs_all)) +
+          geom_bar(stat="identity",fill="green")+ 
+          geom_text(aes(label=local_vs_all), vjust=1.3, color="black", size=3) + 
+          coord_flip()+
+          theme_minimal() +
+          labs(x = "Models",title=paste(s,m,sep="--"))
+  print(p)
+  return(p)
+}
+```
+
+corro para cada estación para cada una de las métricas
+
+## IMPORTANTE FAR positivo indica que enfoque ALL es mejor, en las otras métricas, si es negativo gana ALL
+
+```{r }
+#filtro <- 
+for(s in stations)
+{
+  for(m in metrics){
+    plot_local_vs_all(df,m,s)
+  }
+}
+```
+
+#' ## MOSTRAR RANKING POR recall, precision, F1, sensitivity, etc
+df2 <- df %>%
+  filter(dataset == DATASET & var == ESTACION )  %>% # & alg=="glm" & T == 1 ) %>%
+  arrange(FAR) 
+
+#' Donde dice FAR se puede cambiar por:
+#' Recall,Specificity,Accuracy,Kappa,F1,Precision
+ggplot(data=df2, aes(x= reorder(label,-FAR), y=FAR, color=config.vars)) +
+  geom_bar(stat="identity",fill="white")+ 
+  geom_text(aes(label=FAR), vjust=1.3, color="black", size=3) + 
+  coord_flip()+
+  theme_minimal() +
+  labs(x = "Models", y = "FAR", title="FAR")
+
+ggplot(data=df2, aes(x= reorder(label,Sensitivity), y=Sensitivity, color=config.vars)) +
+  geom_bar(stat="identity",fill="white")+ 
+  geom_text(aes(label=Sensitivity), vjust=1.3, color="black", size=3) + 
+  coord_flip()+
+  theme_minimal() +
+  labs(x = "Models", y = "Sensitivity", title="Sensitivity")
+
+#' Comparativas de sensitivity, precision, F1, 
+#' 
+
+df3 <- df %>%
+  select(label,dataset,var,config.train,config.vars,T,alg,Sensitivity,Specificity,Accuracy,Kappa,F1,Precision) %>%
+  filter(dataset == DATASET & var == ESTACION  & alg==ALGORITMO) # & T == 1 ) %>%
+
+library(reshape2)
+
+df3 <- melt(df3,id=(c("label","dataset","var","config.train","config.vars","T","alg")))
+
+  
+ggplot(data=df3, aes(x= reorder(label,value), y=value, fill=variable)) +
+geom_bar(stat="identity",position=position_dodge())+ 
+coord_flip()+
+theme(legend.position="bottom") +
+labs(x = "Logistic Regression Models", y = "metricas", title="comparacion")
+
+---
+title: "classification-results.R"
+author: "ana"
+date: "Tue Aug  7 13:45:57 2018"
+---

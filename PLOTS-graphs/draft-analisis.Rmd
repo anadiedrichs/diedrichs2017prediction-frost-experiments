@@ -1,0 +1,329 @@
+---
+title: "Gráficos y su interprestación"
+output: html_notebook
+---
+
+```{r}
+library(readr)
+library(ggplot2)
+library(gridExtra)
+library(tidyverse)
+library(lazyeval)
+
+dataset <- read_csv("classification-results.csv")
+dataset[,8:ncol(dataset)] <- round(dataset[,8:ncol(dataset)],digits = 3)
+
+stations <- unique(dataset$var)
+algoritmos <- unique(dataset$alg)
+metrics <- c("FAR","Sensitivity","Specificity","Accuracy","Kappa","F1","Precision")
+
+#' ## Carga dataset
+#' Creación de dataset genérico para resultados clasificación
+df <- dataset %>%
+  unite(dataset, 
+        col=label,c("dataset","var","config.train","config.vars","T","alg"),
+        sep = "-",remove=FALSE) %>% 
+  select(label,dataset,var,config.train,config.vars,T,alg,FAR,Sensitivity,Specificity,Accuracy,Kappa,F1,Precision) 
+
+```
+
+Variabilidad de la Sensitivity por cada estación
+
+```{r}
+p <-ggplot(aes(y = Sensitivity, x = var, fill = config.vars), data = df) + 
+  geom_boxplot()  + coord_flip()
+print(p)
+```
+Los modelos con config-all presentaron mejor desempeño en sensitivity, excepto para Tunuyan y la Llave (este está parejo)
+
+Variabilidad de la Sensitivity por según dataset usado
+
+```{r}
+p <-ggplot(aes(y = Sensitivity, x = dataset, fill = config.vars), data = df) + 
+  geom_boxplot()  + coord_flip()
+print(p)
+```
+
+Variabilidad de F1 por según dataset usado
+
+```{r}
+p <-ggplot(aes(y = F1, x = dataset, fill = config.vars), data = df) + 
+  geom_boxplot()  + coord_flip()
+print(p)
+```
+
+
+No se visualizan gran variabilidad entre los datasets usados entre F1, Sensitivity y precision
+
+Variabilidad de Sensitivity según dataset usado
+
+```{r}
+p <-ggplot(aes(y = Sensitivity, x = dataset, fill = config.train), data = df) + 
+  geom_boxplot()  + coord_flip()
+print(p)
+```
+SMOTE aumenta sensitivity en ambos datasets
+
+Variabilidad de F1 por cada estación
+```{r}
+
+p <-ggplot(aes(y = F1, x = var, fill = config.vars), data = df) + geom_boxplot() + coord_flip()
+print(p)
+
+```
+Los modelos con config-all presentaron mejor desempeño en terminos medios de F1, excepto para Tunuyan y la Llave (este está parejo)
+
+
+Variabilidad de precisión por cada estación
+```{r}
+p <-ggplot(aes(y = Precision , x = var, fill = config.vars), data = df) + geom_boxplot() + coord_flip()
+print(p)
+
+```
+
+En términos medios la precision mejora en las Paredes y Junín con config-local. La llave, tunuyan y agua amarga "parejos"
+
+Según cuántos días anteriores de información sumamos.
+```{r}
+
+#' ## Según cuantos días anteriores de información sumamos.
+#' 
+p <-ggplot(aes(y = Precision , x = var, fill = as.factor(T)), data = df) + geom_boxplot() + coord_flip()
+print(p)
+
+p <-ggplot(aes(y = Sensitivity , x = var, fill = as.factor(T)), data = df) + geom_boxplot() + coord_flip()
+print(p)
+
+p <-ggplot(aes(y = F1 , x = var, fill = as.factor(T)), data = df) + 
+  geom_boxplot() + coord_flip() + labs(fill="T")
+print(p)
+```
+
+En general, con un día o dos se obtienen buenos resultados en términos de precision,recall y F1, ¿podría prescindirse de agregar más? 
+Hay varios casos particulares, por ejemplo Agua amarga en sensitivity para T=1, su media es más baja respecto al T=2, sin embargo el máximo de sensitivity es con T=1.
+
+
+Comparación normal vs smote por estación para métricas sensitivity y precision
+
+```{r}
+p <-ggplot(aes(y = Precision , x = var, fill = config.train), data = df) + geom_boxplot() + coord_flip()
+print(p)
+
+p <-ggplot(aes(y = Sensitivity , x = var, fill = config.train), data = df) + geom_boxplot() + coord_flip()
+print(p)
+
+p <-ggplot(aes(y = F1 , x = var, fill = config.train), data = df) + geom_boxplot() + coord_flip()
+print(p)
+
+```
+La configuración SMoTE aumenta la sensitivity/F1 en detrimento de la precision. Es una consecuencia esperable.
+
+
+Comportamiento general de local vs all de los algoritmos por cada estación según métrica
+
+```{r}
+
+for(s in stations){
+  
+  df1 <- df %>% filter( var == s ) 
+  
+  p <-ggplot(aes(y = F1 , x = alg, fill = config.vars), data = df1) + 
+    geom_boxplot() + coord_flip() + labs(title=paste("Estación",s,sep="  "))
+  print(p)
+  p <-ggplot(aes(y = Sensitivity , x = alg, fill = config.vars), data = df1) + 
+    geom_boxplot() + coord_flip() + labs(title=paste("Estación",s,sep="  "))
+  print(p)
+  p <-ggplot(aes(y = Precision , x = alg, fill = config.vars), data = df1) + 
+    geom_boxplot() + coord_flip() + labs(title=paste("Estación",s,sep="  "))
+  print(p)
+
+}
+
+```
+
+Estaciones vs algoritmos
+
+
+```{r}
+
+df3 <-  df %>% filter( dataset == "dacc" & T==1) 
+
+
+p <-ggplot(aes(y = Precision , x = var, fill = alg), data = df3) + geom_boxplot() + coord_flip()
+print(p)
+
+p <-ggplot(aes(y = Sensitivity , x = var, fill = alg), data = df3) + geom_boxplot() + coord_flip()
+print(p)
+
+png("plot-estaciones-vs-algs-F1-filtro-datasetDacc-T1.png")
+p <-ggplot(aes(y = F1 , x = var, fill = alg), data = df3) + 
+  geom_boxplot() + coord_flip() #+ labs(fill="T")
+
+print(p)
+
+dev.off()
+```
+RF por cada una de las estaciones
+
+
+```{r}
+
+df3 <-  df %>% filter( dataset == "dacc" & T==1 & alg=="rf") 
+
+
+p <-ggplot(aes(y = Precision , x = var, fill = config.vars), data = df3) + geom_boxplot() + coord_flip() + labs(title="Random forest por estaciones")
+print(p)
+
+p <-ggplot(aes(y = Sensitivity , x = var, fill = config.vars), data = df3) + geom_boxplot() + coord_flip() + labs(title="Random forest por estaciones")
+print(p)
+
+p <-ggplot(aes(y = F1 , x = var, fill = config.vars), data = df3) + 
+  geom_boxplot() + coord_flip() #+ labs(fill="T")
+print(p)
+```
+
+GLM por cada una de las estaciones
+
+
+```{r}
+
+df3 <-  df %>% filter( dataset == "dacc" & T==1 & alg=="glm") 
+
+p <-ggplot(aes(y = Precision , x = var, fill = config.vars), data = df3) + geom_boxplot() + coord_flip() + labs(title="Random forest por estaciones")
+print(p)
+
+p <-ggplot(aes(y = Sensitivity , x = var, fill = config.vars), data = df3) + geom_boxplot() + coord_flip() + labs(title="Random forest por estaciones")
+print(p)
+
+p <-ggplot(aes(y = F1 , x = var, fill = config.vars), data = df3) + 
+  geom_boxplot() + coord_flip() #+ labs(fill="T")
+print(p)
+```
+
+
+```{r}
+library(reshape)
+df3 <-  df %>% filter( dataset == "dacc") %>% select(-one_of(c("FAR")))
+
+#  melt(df3,id.vars="label")
+df4 <- melt(as.data.frame(df3),
+            id.vars =(c("label","dataset","var","config.train","config.vars","T","alg")),
+            measure.vars = metrics[-1])
+
+p <-ggplot(aes(y = value , x = var, fill = variable), data = df4) + 
+  geom_boxplot() + coord_flip() + labs(title="Variabilidad de las métricas por las estaciones")
+print(p)
+
+df4 <- df %>% filter( dataset == "dacc")   
+df4 <- melt(as.data.frame(df4),
+            id.vars =(c("label","dataset","var","config.train","config.vars","T","alg")),
+            measure.vars = metrics)
+
+for(a in algoritmos)
+{
+  for(m in metrics)
+  {
+    df5 <- df4 %>% filter( alg == a & variable == m) 
+    p <-ggplot(aes(y = value , x = var, fill = config.vars), data = df5) + 
+      geom_boxplot() + coord_flip() + labs(title=paste("Comportamiento de ",m," en modelo ",a,sep=""))
+    print(p)
+  }
+}
+```
+
+Random forest
+
+* En agua  amarga y Tunuyan, el FAR es menor en modelos config all. También para estas estaciones config all tiene mayores valores de specificity y precision que config local, lo contrario para las restantes. Lo contrario para el resto de las estaciones (gana local)
+* Los mejores modelos en terminos de sensitivity/recall son config all
+* Valores de accuracy entre (aproximado) 0.89 y 0.94
+* Valor de Kappa aumenta (hay mayores valores) con config all, analizando las medias
+
+```{r}
+df3 <- df %>%
+      select(label,dataset,var,config.train,config.vars,T,alg,Sensitivity,Specificity,Accuracy,Kappa,F1,Precision) %>%
+      filter( var == stations[1]  & alg==algoritmos[1]) # & T == 1 & dataset == DATASET &
+    
+df3
+```
+
+```{r}
+
+for(s in stations)
+{
+  for(a in algoritmos)
+  {
+    
+    df3 <- df %>%
+      select(label,dataset,var,config.train,config.vars,T,alg,Sensitivity,Specificity,Accuracy,Kappa,F1,Precision) %>%
+      filter( var == s  & alg==a & T == 1 & dataset == "dacc") # &  # <- AQUI FILTRO
+    
+    df7 <- melt(as.data.frame(df3),id=(c("label","dataset","var","config.train","config.vars","T","alg")))
+    
+    
+   p<-  ggplot(data=df7, aes(x= reorder(label,value), y=value, fill=variable)) +
+      geom_bar(stat="identity",position=position_dodge())+
+      coord_flip()+
+      theme(legend.position="bottom") +
+      labs(x = a, y = "metricas", title=paste("comparacion",a,s,sep="-"))
+   print(p)
+    
+    # for(m in metrics){
+    #   plot_ranking_alg(df3,m,s,a)
+    #   
+    # }
+  }
+}    
+```
+
+Filtramos para quedarnos con los modelos cuya Sensitivity y Precision haya sido mayor o igual a 0.7, observar el comportamiento por estación y algoritmo
+
+Lo siguiente da error: verificar/chequear
+```{r}
+for(s in stations)
+{
+  for(a in algoritmos)
+  {
+    
+    df3 <- df %>%
+          select(label,dataset,var,config.train,config.vars,T,alg,Sensitivity,Precision,F1) %>% #,Specificity,Accuracy,Kappa,F1
+          filter( Sensitivity > 0.7 , Precision > 0.7 , var==s, dataset == "dacc",alg==a ) # & T == 1 & dataset == DATASET &
+        
+    
+    df7 <- melt(data.frame(df3),id=(c("label","dataset","var","config.train","config.vars","T","alg")))
+        
+      
+    p<-  ggplot(data=df7, aes(x= label, y=value, fill=variable)) +
+          geom_bar(stat="identity",position=position_dodge())+
+          coord_flip()+
+          theme(legend.position="bottom") +
+          labs(title=paste("Estacion ",s," algoritmo ", a))
+       print(p)
+  }
+}  
+```
+```{r}
+stations
+```
+
+
+Si queremos correr lo anterior fuera del for o bucle
+```{r}
+df3 <- df %>%
+      select(label,dataset,var,config.train,config.vars,T,alg,Sensitivity,Precision) %>% #,Specificity,Accuracy,Kappa,F1
+      filter( Sensitivity > 0.7 , Precision > 0.7 , var==stations[1], dataset == "dacc",alg=="rf" ) # & T == 1 & dataset == DATASET &
+    
+
+df7 <- melt(as.data.frame(df3),id=(c("label","dataset","var","config.train","config.vars","T","alg")))
+    
+    
+    
+```
+```{r}
+p<-  ggplot(data=df7, aes(x= label, y=value, fill=variable)) +
+      geom_bar(stat="identity",position=position_dodge())+
+      coord_flip()+
+      theme(legend.position="bottom") +
+      labs(title="")
+   print(p)
+```
+

@@ -79,8 +79,8 @@ plot_local_vs_all <- function(df,m,s)
 }
 #' corro para cada estación para cada una de las métricas
 #' 
-#' ## IMPORTANTE, las barras representan la resta de local - all para
-#' alguna métrica. Barra negativa significa  que config ALL aporta 
+#' ## IMPORTANTE, las barras representan la resta de local - all para alguna métrica. 
+#' ## Barra negativa significa  que config ALL es mayor a local 
 #' (info de las otras estaciones)
 lista <- NULL
 for(s in stations)
@@ -99,8 +99,8 @@ for(s in stations)
 plot_ranking_alg <- function(df,m,s,alg)
 {
   df2 <- df 
-  # quedarme con columna metrica, seleccionarla
-  colnames(df2[,m]) <- "metric"
+  # renombrar columna con la métrica
+  colnames(df2)[which(colnames(df2) == m)] <- c("metric")
   
   p <- ggplot(data=df2, aes(x= reorder(label,metric), y=metric, 
                        color=config.vars)) +
@@ -108,11 +108,13 @@ plot_ranking_alg <- function(df,m,s,alg)
     geom_text(aes(label=metric), vjust=1.3, color="black", size=3) +
     coord_flip()+
     theme_minimal() +
-    labs(x = "Models",y=m, title=paste(s,m,sep="--"))
+    labs(x = "Models",y=m, title=paste(s,alg,m,sep="--"))
   print(p)
-  plot(p)
+  #plot(p)
   
 }
+#' # Comparativas de sensitivity, precision, F1,
+#'
 
 #' #' ## MOSTRAR RANKING POR recall, precision, F1, sensitivity, etc
 plot_comparativo <- function(df,s,alg)
@@ -131,6 +133,9 @@ plot_comparativo <- function(df,s,alg)
 
 library(reshape2)
 
+
+metrics <- c("Sensitivity","Specificity","Accuracy","Kappa","F1","Precision") #"FAR",
+
 for(s in stations)
 {
   for(a in algoritmos)
@@ -143,18 +148,12 @@ for(s in stations)
     plot_comparativo(df3,s,a)
     
     for(m in metrics){
-      plot_ranking_alg(df3,s,a)
-      
-      
+      plot_ranking_alg(df3,m,s,a)
       
     }
   }
 }
-#' Donde dice FAR se puede cambiar por:
-#' Recall,Specificity,Accuracy,Kappa,F1,Precision
 
-#' Comparativas de sensitivity, precision, F1,
-#'
 
 
 

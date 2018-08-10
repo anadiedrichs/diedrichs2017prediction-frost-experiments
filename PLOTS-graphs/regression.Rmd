@@ -1,0 +1,66 @@
+---
+title: "Regression análisis"
+output:
+  html_document:
+    df_print: paged
+---
+
+
+```{r}
+suppressMessages(library(readr))
+suppressMessages(library(ggplot2))
+suppressMessages(library(gridExtra))
+suppressMessages(library(tidyverse))
+suppressMessages(library(lazyeval))
+
+dataset <- suppressMessages(read_csv("regression-results.csv"))
+dataset[,8:ncol(dataset)] <- round(dataset[,8:ncol(dataset)],digits = 3)
+stations <- unique(dataset$var)
+algoritmos <- unique(dataset$alg)
+metrics <- c("MAE","RMSE","R2")
+
+
+```
+```{r}
+#' ## Carga dataset
+#' Creación de dataset genérico para resultados clasificación
+df <- dataset %>%
+  unite(dataset, 
+        col=label,c("dataset","var","config.train","config.vars","T","alg"),
+        sep = "-",remove=FALSE) %>% 
+  select(label,dataset,var,config.train,config.vars,T,alg,MAE,RMSE,R2) 
+df
+
+```
+
+Performance de algoritmos por cada estación.
+( no noto grandes diferencias...particularidades en cada estación)
+```{r}
+p <-ggplot(aes(y = MAE , x = var, fill = alg), data = df) + geom_boxplot() + coord_flip()
+print(p)
+
+p <-ggplot(aes(y = RMSE , x = var, fill = alg), data = df) + geom_boxplot() + coord_flip()
+print(p)
+
+p <-ggplot(aes(y = R2 , x = var, fill = alg), data = df) + 
+  geom_boxplot() + coord_flip() #+ labs(fill="T")
+print(p)
+
+```
+
+Por cada estacion: local vs all
+Evidentemente, la config all disminuye error en todas las estaciones.
+```{r}
+
+p <-ggplot(aes(y = MAE , x = var, fill = config.vars), data = df) + geom_boxplot() + coord_flip()
+print(p)
+
+p <-ggplot(aes(y = RMSE , x = var, fill = config.vars), data = df) + geom_boxplot() + coord_flip()
+print(p)
+
+#png("plot-estaciones-vs-algs-F1-filtro-datasetDacc-T1.png")
+p <-ggplot(aes(y = R2 , x = var, fill = config.vars), data = df) + 
+  geom_boxplot() + coord_flip() #+ labs(fill="T")
+
+print(p)
+```
