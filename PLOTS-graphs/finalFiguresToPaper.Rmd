@@ -1,0 +1,214 @@
+---
+title: "Gráficos y su interpretación"
+output:
+  html_document:
+    df_print: paged
+---
+
+
+```{r}
+suppressMessages(library(readr))
+suppressMessages(library(ggplot2))
+suppressMessages(library(gridExtra))
+suppressMessages(library(tidyverse))
+suppressMessages(library(lazyeval))
+library(reshape2)
+```
+
+### REGRESSION
+
+```{r}
+
+dataset <- suppressMessages(read_csv("regression-results.csv"))
+dataset[,8:ncol(dataset)] <- round(dataset[,8:ncol(dataset)],digits = 3)
+stations <- unique(dataset$var)
+algoritmos <- unique(dataset$alg)
+metrics <- c("MAE","RMSE","R2")
+```
+
+```{r}
+#' ## Carga dataset
+#' Creación de dataset genérico para resultados clasificación
+df <- dataset %>%
+  unite(dataset, 
+        col=label,c("dataset","var","config.train","config.vars","T","alg"),
+        sep = "-",remove=FALSE) %>% 
+  select(label,dataset,var,config.train,config.vars,T,alg,MAE,RMSE,R2) 
+
+new = c("Tunuyan","Agua_Amarga","Junin","La_LLave","Las_Paredes")
+orig = c("tunuyan.temp_min","agua_amarga.temp_min"
+         ,"junin.temp_min","la_llave.temp_min"
+         ,"las_paredes.temp_min")
+dfnames = data.frame(orig=as.character(orig),new=as.character(new),
+                     stringsAsFactors = FALSE)
+
+df <- as.data.frame(df)
+
+df[df$var == dfnames[1,1],"var"] <- dfnames[1,2]
+df[df$var == dfnames[2,1],"var"] <- dfnames[2,2]
+df[df$var == dfnames[3,1],"var"] <- dfnames[3,2]
+df[df$var == dfnames[4,1],"var"] <- dfnames[4,2]
+df[df$var == dfnames[5,1],"var"] <- dfnames[5,2]
+
+df[df$alg == "bnReg","alg"] <- "Bayesian networks"
+df[df$alg == "rf","alg"] <- "Random forest"
+
+```
+
+```{r}
+#png("./vanAlPaper/regresion1.png")
+p <-ggplot(aes(y = RMSE , x = var), data = df) +
+  geom_boxplot(aes(color=config.vars)) + coord_flip() +
+  labs(fill="config",color="config",x="stations",title="Regression models") + facet_wrap(~alg) +theme_bw()
+
+print(p)
+ggsave("./vanAlPaper/regression-RMSE-localVSAll.eps",plot=p,device = "eps",units = "in", width = 10, height = 6)
+#dev.off()
+```
+```{r}
+# ESTA IMAGEN VA AL PAPER
+#png("./vanAlPaper/regresion1.png")
+p <-ggplot(aes(y = MAE , x = var), data = df) +
+  geom_boxplot(aes(color=config.vars)) + coord_flip() +
+  labs(fill="config",color="config",x="stations",title="Regression models") + facet_wrap(~alg) +theme_bw()
+
+print(p)
+
+ggsave("./vanAlPaper/regression-MAE-localVSAll.eps",plot=p,device = "eps",units = "in", width = 10, height = 6)
+#dev.off()
+```
+### CLASSIFICATION
+```{r}
+
+dataset <- suppressMessages(read_csv("classification-results.csv"))
+dataset[,8:ncol(dataset)] <- round(dataset[,8:ncol(dataset)],digits = 3)
+
+algoritmos <- unique(dataset$alg)
+metrics <- c("FAR","Sensitivity","Specificity","Accuracy","Kappa","F1","Precision")
+
+#' ## Carga dataset
+#' Creación de dataset genérico para resultados clasificación
+df <- dataset %>%
+  unite(dataset, 
+        col=label,c("dataset","var","config.train","config.vars","T","alg"),
+        sep = "-",remove=FALSE) %>% 
+  select(label,dataset,var,config.train,config.vars,T,alg,FAR,Sensitivity,Specificity,Accuracy,Kappa,F1,Precision) 
+
+new = c("Tunuyan","Agua_Amarga","Junin","La_LLave","Las_Paredes")
+ #"tunuyan.temp_min"
+orig = c("tunuyan.temp_min","agua_amarga.temp_min"
+         ,"junin.temp_min","la_llave.temp_min"
+         ,"las_paredes.temp_min")
+dfnames = data.frame(orig=as.character(orig),new=as.character(new),
+                     stringsAsFactors = FALSE)
+
+df <- as.data.frame(df)
+
+df[df$var == dfnames[1,1],"var"] <- dfnames[1,2]
+df[df$var == dfnames[2,1],"var"] <- dfnames[2,2]
+df[df$var == dfnames[3,1],"var"] <- dfnames[3,2]
+df[df$var == dfnames[4,1],"var"] <- dfnames[4,2]
+df[df$var == dfnames[5,1],"var"] <- dfnames[5,2]
+
+
+stations <- unique(df$var)
+
+#gsubfn("_.*", toupper, gsub(".temp_min", "", df$var))
+
+```
+
+
+## Clasificación
+
+Estaciones vs algoritmos: cuales de los algoritmos son "mejores" respecto a F1, Recall, precision
+
+
+```{r}
+
+df3 <-  df %>% filter( dataset == "dacc" )#& T==1 ) 
+
+df3[df3$alg == "glm","alg"] <- "Logistic Regression"
+df3[df3$alg == "rf","alg"] <- "Random Forest"
+df3[df3$alg == "rpart","alg"] <- "Rpart"
+
+```
+```{r}
+#p <-ggplot(aes(y = Precision , x = var, fill = alg), data = df3) + geom_boxplot() + coord_flip()
+#print(p)
+
+#p <-ggplot(aes(y = Sensitivity , x = var, fill = alg), data = df3) + geom_boxplot() + coord_flip()
+#print(p)
+
+#png("./vanAlPaper/plot-estaciones-vs-algs-F1-filtro-datasetDacc-T1.png")
+p <-ggplot(aes(y = F1 , x = var, fill = alg), data = df3) + 
+  geom_boxplot() + coord_flip() + labs(fill="algorithm",x="stations")
+
+print(p)
+
+
+ggsave("./vanAlPaper/plot-estaciones-vs-algs-F1-filtro-datasetDacc-T1.eps",plot=p,device = "eps",units = "in", width = 10, height = 6)
+#dev.off()
+```
+
+TODO VA AL PAPER
+Config smote vs normal, porque nos quedamos con SMOTE
+
+```{r}
+df4 <- df %>% filter( dataset == "dacc" )#& T == 1) #& alg %in% c("rf","glm"))   
+df4 <- melt(as.data.frame(df4),
+            id.vars =(c("label","dataset","var","config.train","config.vars","T","alg")),
+            measure.vars = c("Sensitivity","Precision"))
+
+for(a in c("rf","glm"))
+{ 
+   #a = "glm"
+   if(a == "rf"){title = "Random Forest"}else{title="Logistic Regression"}
+    df5 <- df4 %>% filter( alg ==a) 
+    
+   # png(paste("./vanAlPaper/alg",a,"configLocalvsAll",".png",sep="-"))
+#    p <-ggplot(aes(y = value , x = var, fill = variable), data = df5) + 
+#      geom_boxplot() + coord_flip() + labs(title=title,x="stations",y="",fill="") + theme(legend.position="bottom")+
+#  facet_wrap(~config.vars)
+#    print(p)
+    #dev.off()
+    
+    
+    #png(paste("./vanAlPaper/alg",a,"configSMOTEvsNORMAL",".png",sep="-"))
+    p <-ggplot(aes(y = value , x = var), data = df5) + 
+      geom_boxplot(aes(color=config.train)) + coord_flip() + labs(title=title,x="stations",y="",fill="",color="config") + #theme(legend.position="bottom")+
+      facet_wrap(~variable) +theme_bw()
+    print(p)
+    ggsave(paste("./vanAlPaper/",a,"-configSMOTEvsNORMAL",".eps",sep=""),plot=p,device = "eps",units = "in", width = 10, height = 6)
+
+    #dev.off()
+      
+}
+```
+
+config local vs config all - va al paper como mostrarlo
+
+```{r}
+
+df4 <- df %>% filter( dataset == "dacc" )#& config.train=="smote")   
+df4 <- melt(as.data.frame(df4),
+            id.vars =(c("label","dataset","var","config.train","config.vars","T","alg")),
+            measure.vars = c("F1"))
+   
+df4[df4$alg == "glm","alg"] <- "Logistic Regression"
+df4[df4$alg == "rf","alg"] <- "Random Forest"
+
+    df5 <- df4 %>% filter( alg %in% c("Random Forest","Logistic Regression"))#& T %in% c(1,2,3,4)) 
+
+    
+    p <-ggplot(aes(y = value , x = var), data = df5) +   #, fill = config.vars
+      geom_boxplot(aes(color=config.vars)) + #+ scale_colour_viridis_d(option="E") +
+      #theme(legend.position="bottom") +
+      coord_flip() + labs(color="config", x = "stations",y="F1")+theme_bw() +
+      facet_wrap(~alg) + theme(legend.position="bottom")
+
+    #print(p)
+  p
+  
+ggsave("./vanAlPaper/RF-LogReg-configAllVsLocal.eps",plot=p,device = "eps",units = "in", width = 10, height = 6)
+#}
+```
