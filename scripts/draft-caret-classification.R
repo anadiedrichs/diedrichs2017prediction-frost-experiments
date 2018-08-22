@@ -14,8 +14,8 @@ VERBOSE <- TRUE
 TMIN_CHAAR <-NULL
 DATA <- "dacc" # possible values: dacc, inta, ur, needed for dataset-processing.R
 if(DATA=="inta"){TMIN_CHAAR <-TRUE}else{TMIN_CHAAR <-FALSE}
-OUTPUT.FILE <- "output-llave" # <- where prints go while cluster is running
-FILE.RESULT.NAME <- "--experimento-class-llave.csv"
+OUTPUT.FILE <- "output-dacc-3-4" # <- where prints go while cluster is running
+FILE.RESULT.NAME <- "--experimento-class-dacc-3-4.csv"
 PATH.MODELS <- "./models-class/"
 PATH.RESULTS <- "./results-class/"
 PATH.SAVE.DATASET <- "./datasets-class/"
@@ -23,16 +23,16 @@ PATH.SAVE.DATASET <- "./datasets-class/"
 # si quiero guardar los modelos en .RData file 
 SAVE_MODEL <- TRUE
 # si quiero que los experimentos se ejecuten paralelamente en clusters o secuencialmente (porque estoy en debug o rstudio)
-PAR <- FALSE  #TODO PRODUCTION
+PAR <- TRUE  #TODO PRODUCTION
 #normal: just split train and test set, smote: oversampling of the minority class.
 config.train <-c("smote","normal")
-config.vars <-c("all")#local","all") #only local variables or all variables.
+config.vars <-c("local","all") #only local variables or all variables.
 #' T cuantos dias anteriores tomamos
-period <- c(1,2)#,2)#,3,4)#,5)
+period <- c(3,4) #,2)#,3,4)#,5)
 # rf: random forest, glm: logistic regression
-models <- c("rf")#C5.0","glm","rpart")#,"rf") #,
+models <- c("C5.0","glm","rpart")#,"rf") #,
 #1: Junin, 2: Tunuyan, 3: agua amarga, 4: paredes, 5: la llave
-stations <- c(5)#,2,3,4,5)
+stations <- c(1,2,3,4,5)
 
 INITIAL.WINDOW <- 3200
 HORIZON <- 500
@@ -162,11 +162,11 @@ for(j in 1:length(dataset)) # POR cada uno de los datasets
         Log("config.vars ",config.vars[cvars])
 
         #foreach(t = 1:length(period),.packages = packages) %dopar% 
-        for(t in 1:length(period))
+        for(t in period)
         {
           Log("T value ",t)
           
-          aux <- build.dataset.classification(t=period[t],
+          aux <- build.dataset.classification(t=t,
                                               dataset=sensores, 
                                               pred_sensores, 
                                               pred_sensores[p],
