@@ -1,0 +1,188 @@
+---
+title: "competitors-frost"
+author: "Ana Laura Diedrichs"
+date: "October 3, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Contrastación con competidores 
+```{r}
+# archivos resultado bnReg y rf por cada estacion
+# nombre variable predictora
+```
+
+## Datasets
+
+```{r,include=FALSE}
+# var: nombre variable a predecir,ejemplo *_tmin
+vars.del.sensor <- function(var,variables,dataset_tmin_chaar=FALSE)
+{
+  v <- variables
+  sensor <- unlist(strsplit(var,split=".",fixed = TRUE))[1]
+  if(dataset_tmin_chaar==TRUE) sensor <- paste(sensor,".",sep="") # esto es lo diferente, por bug #
+  
+  vars <- v[grepl( sensor, v, fixed = TRUE)] # extraigo todas las variables relacionadas con sensor
+  #vars <- vars[-length(vars)] # quito la última variable min_t
+  return(vars)
+}
+library(caret)
+source("../dataset-processing.R")
+source("../metrics.R")
+
+dataset <- get.dataset("dacc")
+
+data <- dataset$data
+```
+
+```{r}
+#dividir dataset en entrenamiento y testeo.
+### Training set y test dataset
+# porcentaje para train set split
+porc_train = 0.68
+until <- round(nrow(data)*porc_train)
+
+```
+## Junin
+
+```{r}
+#' consideramos estacion junin
+print(dataset$pred[1])
+vars <- vars.del.sensor(dataset$pred[1],colnames(data))
+training.set = data[1:until-1, vars] # This is training set to learn the parameters
+test.set = data[until:nrow(data), vars]
+
+```
+
+
+```{r}
+library(frost)
+dewpoint <- calcDewPoint(training.set$junin.humedad_med,training.set$junin.temp_med,mode = "B")
+dw.test <- calcDewPoint(test.set$junin.humedad_med,test.set$junin.temp_med,mode = "B")
+
+
+
+```
+
+### Mdz empirico
+```{r}
+model.mza <- buildMdz(dw=dewpoint, tempMax=training.set$junin.temp_max, tmin=training.set$junin.temp_min)
+
+# espero un arreglo de valores. si da error, deberé usar sapply.
+predmza <- predMdz(dw = dw.test, tempMax = test.set$junin.temp_max, model=model.mza)
+
+evaluate(predmza,test.set$junin.temp_min)
+
+plot(predmza,test.set$junin.temp_min)
+
+```
+
+
+### FAO
+```{r}
+model.FAO <- buildFAO(dw=dewpoint,temp = training.set$junin.temp_med,tmin=training.set$junin.temp_min)
+
+# espero un arreglo de valores. si da error, deberé usar sapply.
+pred <- predFAO(model=model.FAO,t=test.set$junin.temp_med,dw=dw.test)
+# comparar resultados
+evaluate(pred,test.set$junin.temp_min)
+
+plot(pred,test.set$junin.temp_min)
+
+```
+
+
+### Random forest
+```{r}
+library(readr)
+dacc_junin_rf <- read_csv("dacc--junin.temp_min--normal--all--1--rf--Y-vs-Y_pred.csv")
+evaluate(dacc_junin_rf$y_pred,dacc_junin_rf$y_real)
+plot(dacc_junin_rf$y_pred,dacc_junin_rf$y_real)
+
+
+```
+### BN
+
+```{r}
+dacc_junin_bn <- read_csv("dacc--junin.temp_min--normal--all--1--bnReg--Y-vs-Y_pred.csv")
+evaluate(dacc_junin_bn$y_pred,dacc_junin_bn$y_real)
+plot(dacc_junin_bn$y_pred,dacc_junin_bn$y_real)
+
+```
+
+## Tunuyan
+
+```{r}
+dataset$pred[2]
+```
+
+```{r}
+#' TUNUYAN
+print(dataset$pred[2])
+vars <- vars.del.sensor(dataset$pred[2],colnames(data))
+
+```
+```{r}
+training.set = data[1:until-1, vars] # This is training set to learn the parameters
+test.set = data[until:nrow(data), vars]
+
+```
+
+
+```{r}
+library(frost)
+dewpoint <- calcDewPoint(training.set$tunuyan.humedad_med,training.set$tunuyan.temp_med,mode = "B")
+dw.test <- calcDewPoint(test.set$tunuyan.humedad_med,test.set$tunuyan.temp_med,mode = "B")
+
+```
+
+### Mdz empirico
+```{r}
+model.mza <- buildMdz(dw=dewpoint, tempMax=training.set$tunuyan.temp_max, tmin=training.set$tunuyan.temp_min)
+
+# espero un arreglo de valores. si da error, deberé usar sapply.
+predmza <- predMdz(dw = dw.test, tempMax = test.set$tunuyan.temp_max, model=model.mza)
+
+evaluate(predmza,test.set$tunuyan.temp_min)
+
+plot(predmza,test.set$tunuyan.temp_min)
+
+```
+
+
+### FAO
+```{r}
+model.FAO <- buildFAO(dw=dewpoint,temp = training.set$tunuyan.temp_med,tmin=training.set$tunuyan.temp_min)
+
+# espero un arreglo de valores. si da error, deberé usar sapply.
+pred <- predFAO(model=model.FAO,t=test.set$tunuyan.temp_med,dw=dw.test)
+# comparar resultados
+evaluate(pred,test.set$tunuyan.temp_min)
+
+plot(pred,test.set$tunuyan.temp_min)
+
+```
+
+
+### Random forest
+```{r}
+library(readr)
+dacc_junin_rf <- read_csv("dacc--tunuyan.temp_min--normal--all--1--rf--Y-vs-Y_pred.csv")
+evaluate(dacc_junin_rf$y_pred,dacc_junin_rf$y_real)
+plot(dacc_junin_rf$y_pred,dacc_junin_rf$y_real)
+
+
+```
+### BN
+
+```{r}
+dacc_junin_bn <- read_csv("dacc--tunuyan.temp_min--normal--all--1--bnReg--Y-vs-Y_pred.csv")
+evaluate(dacc_junin_bn$y_pred,dacc_junin_bn$y_real)
+plot(dacc_junin_bn$y_pred,dacc_junin_bn$y_real)
+
+```
+
+
