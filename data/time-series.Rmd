@@ -1,0 +1,81 @@
+---
+title: "time-series-plots-test"
+author: "Ana Laura Diedrichs"
+date: "October 7, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Importar datos
+
+```{r}
+library(forecast)
+library(readr)
+dacc_daily_tmin <- read_csv("dacc-daily-tmin.csv", 
+    col_types = cols(X1 = col_skip()))
+head(dacc_daily_tmin)
+```
+
+```{r}
+head(dacc_daily_tmin[,c(1,7)])
+```
+
+
+```{r}
+library(xts)
+data_junin_min <- xts(dacc_daily_tmin$junin.temp_min,order.by = dacc_daily_tmin$date)
+data<- xts(dacc_daily_tmin[-1],order.by = dacc_daily_tmin$date)
+
+```
+
+```{r}
+head(data_junin_min)
+```
+```{r}
+head(data)
+```
+
+## Graficar datos, plots 
+
+
+```{r}
+plot.xts(data)
+```
+
+```{r}
+#data.ts <- as.ts(data)
+#plot.ts(data.ts)
+```
+
+```{r}
+autoplot(data)
+```
+```{r}
+library(ggfortify)
+autoplot(data)
+```
+
+## ACF
+
+```{r}
+acf(data_junin_min)
+```
+
+## seasonal plot 
+```{r}
+#ggseasonplot(as.ts(data_junin_min))
+```
+## auto arima 
+```{r}
+library(forecast)
+d.arima <- auto.arima(data_junin_min)
+d.forecast <- forecast(d.arima, level = c(95), h = 100)
+autoplot(d.forecast)
+```
+```{r}
+library(forecast)
+ggtsdiag(auto.arima(data_junin_min))
+```
